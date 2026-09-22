@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一颗弹珠，让整间实验室下班</title>
+  <style>
+:root{--ink:#18221d;--paper:#f3efe5;--cream:#fbf8f0;--green:#203d32;--mint:#b8d7bd;--brass:#c99543;--red:#d65c45;--line:#c8c3b6;--muted:#7b8179}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif}.shell{max-width:1680px;margin:auto;padding:28px 38px 18px}.topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--ink);padding-bottom:20px}.eyebrow,.block-label,.stage-caption,footer,.log-heading button{font:500 10px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase}.eyebrow{margin:0 0 10px;color:var(--red)}h1{font-size:clamp(28px,3.2vw,54px);line-height:.98;letter-spacing:-.06em;margin:0;max-width:760px}.subtitle{margin:14px 0 0;color:#687068;font-size:14px}.sign{border:1px solid var(--ink);padding:12px 16px;min-width:128px;font:500 14px 'DM Mono';display:flex;align-items:center;gap:9px;justify-content:center;background:var(--cream)}.sign-dot{width:9px;height:9px;border-radius:50%;background:var(--brass);box-shadow:0 0 0 4px #ead9b9}.sign.off{background:var(--red);color:#fff}.sign.off .sign-dot{background:#fff;box-shadow:0 0 0 4px #e98b79}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;margin-top:22px}.stage-wrap{background:var(--green);border:1px solid var(--ink);position:relative;overflow:hidden;min-height:530px}.stage-wrap canvas{display:block;width:100%;height:auto;cursor:crosshair}.stage-caption{position:absolute;left:16px;right:16px;bottom:13px;display:flex;justify-content:space-between;color:#bdd0bd}.control-panel{display:flex;flex-direction:column;gap:13px}.panel-block{border-top:1px solid var(--ink);padding-top:11px}.block-label{color:#788078;margin-bottom:10px}.primary,.button-row button,.intervention{font:500 12px 'Space Grotesk';border:1px solid var(--ink);cursor:pointer}.primary{background:var(--red);color:white;width:100%;padding:14px;text-align:left;display:flex;justify-content:space-between}.primary:hover{background:#bb4937}.button-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.button-row button{background:var(--ink);color:#fff;padding:10px}.button-row .ghost{background:transparent;color:var(--ink)}button:disabled{opacity:.35;cursor:not-allowed}.intervention{width:100%;background:transparent;padding:10px 8px;display:grid;grid-template-columns:22px 1fr 18px;text-align:left;align-items:center;border-bottom:0}.intervention:last-of-type{border-bottom:1px solid var(--ink)}.intervention b,.intervention small{display:block}.intervention small{color:var(--muted);font-size:10px;margin-top:2px}.intervention i{font-style:normal;font-size:18px}.intervention.active{background:var(--mint)}.mini-icon{font-size:17px}.toggle-line,.range-line{display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:12px 8px;border-bottom:1px solid var(--line)}.toggle-line input{display:none}.toggle{width:30px;height:17px;border:1px solid var(--ink);border-radius:20px;position:relative}.toggle:after{content:'';position:absolute;width:11px;height:11px;top:2px;left:2px;background:var(--ink);border-radius:50%;transition:.15s}.toggle-line input:checked+.toggle{background:var(--brass)}.toggle-line input:checked+.toggle:after{left:15px;background:#fff}.range-line{display:block}.range-line span{display:flex;justify-content:space-between;margin-bottom:8px}.range-line strong{font:500 11px 'DM Mono'}.range-line input{width:100%;accent-color:var(--red)}.readout{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding:7px 0;font-size:12px}.readout strong{font:500 12px 'DM Mono';color:var(--green)}.log-heading{display:flex;justify-content:space-between;align-items:start}.log-heading button{border:0;background:none;padding:0;color:var(--red);cursor:pointer}.log{height:150px;overflow:auto;background:#e9e5da;padding:9px;font:10px/1.55 'DM Mono',monospace}.log-entry{border-bottom:1px solid #d4d0c5;padding:3px 0}.log-entry .time{color:var(--red)}.legend{display:flex;gap:12px;font:9px 'DM Mono';color:var(--muted)}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}.contact{background:var(--red)}.constraint{background:var(--brass)}.sound{background:var(--green)}footer{display:flex;justify-content:space-between;color:#8b9089;margin-top:13px;font-size:9px}@media(max-width:1050px){.shell{padding:20px}.workspace{grid-template-columns:1fr}.control-panel{display:grid;grid-template-columns:1fr 1fr}.log-block,.diagnostics{grid-column:auto}footer{display:none}}@media(max-width:650px){.shell{padding:14px}.topbar{align-items:start;gap:15px}.sign{min-width:100px;padding:9px;font-size:11px}.subtitle{font-size:12px}.control-panel{display:flex}.stage-wrap{min-height:0}}
+
+</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MECHANICAL CHAIN / 01</p>
+        <h1>一颗弹珠，让整间实验室下班</h1>
+        <p class="subtitle">只给第一颗球一次释放。剩下的，交给接触、重力与杠杆。</p>
+      </div>
+      <div class="sign" id="sign"><span class="sign-dot"></span><span id="signText">营业中</span></div>
+    </header>
+
+    <section class="workspace">
+      <div class="stage-wrap">
+        <canvas id="stage" width="1400" height="720" aria-label="桌面连锁机械装置动画"></canvas>
+        <div class="stage-caption"><span>LIVE CUTAWAY</span><span>点击部件可放大局部</span></div>
+      </div>
+
+      <aside class="control-panel">
+        <div class="panel-block hero-control">
+          <div class="block-label">01 / 释放控制</div>
+          <button class="primary" id="releaseBtn">释放第一颗球 <span>↗</span></button>
+          <div class="button-row"><button id="pauseBtn">暂停</button><button class="ghost" id="resetBtn">重置</button></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="block-label">02 / 现场干预</div>
+          <button class="intervention" id="lockBtn"><span class="mini-icon">⊣</span><span><b>锁住跷跷板</b><small>弹珠抵达之前</small></span><i>○</i></button>
+          <button class="intervention" id="barrierBtn"><span class="mini-icon">▥</span><span><b>插入挡板</b><small>小车进入多米诺区前</small></span><i>○</i></button>
+          <label class="toggle-line"><span>重力调为 0.5×</span><input type="checkbox" id="gravityToggle"><span class="toggle"></span></label>
+          <label class="range-line"><span>释放高度 <strong id="heightValue">100%</strong></span><input type="range" id="heightRange" min="95" max="105" value="100" step="1"></label>
+        </div>
+
+        <div class="panel-block diagnostics">
+          <div class="block-label">03 / 诊断读数</div>
+          <div class="readout"><span>当前环节</span><strong id="stageValue">待机</strong></div>
+          <div class="readout"><span>无因果事件</span><strong id="causalValue">0</strong></div>
+          <div class="readout"><span>碰撞→声音</span><strong id="latencyValue">—</strong></div>
+        </div>
+
+        <div class="panel-block log-block">
+          <div class="log-heading"><div class="block-label">04 / 事件日志</div><button id="exportBtn">导出 JSON</button></div>
+          <div class="log" id="log" aria-live="polite"></div>
+        </div>
+        <div class="legend"><span><i class="dot contact"></i>真实接触</span><span><i class="dot constraint"></i>约束变化</span><span><i class="dot sound"></i>声音事件</span></div>
+      </aside>
+    </section>
+    <footer><span>ENERGY SOURCE: 初始重力势能</span><span>MODEL: fixed-step semi-implicit Euler / restitution 0.25</span><span>RESET CLEARS CALLBACKS + AUDIO</span></footer>
+  </main>
+  <script>const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id); const W=1400,H=720;
+const parts=[{id:'marble',x:170,y:0,w:190,h:260,label:'01  滚动'},{id:'seesaw',x:360,y:250,w:220,h:180,label:'02  跷跷板'},{id:'gate',x:570,y:250,w:170,h:200,label:'03  闸门'},{id:'cart',x:680,y:350,w:230,h:180,label:'04  小车'},{id:'domino',x:850,y:300,w:280,h:250,label:'05  多米诺'},{id:'bell',x:1100,y:150,w:250,h:300,label:'06  铃'}];
+let sim,events=[],audioCtx=null,lastFrame=0,zoom=null;
+function fresh(){return{running:false,paused:false,t:0,g:520,height:1,marble:{x:160,y:116,v:0,contact:false,done:false},seesaw:{angle:0,omega:0,locked:false,tripped:false},gate:{open:0,released:false},cart:{x:620,v:0,started:false,hitDomino:false,stopped:false},dominoes:Array.from({length:7},(_,i)=>({x:865+i*34,angle:0,falling:false,done:false})),barrier:false,bell:{hammer:0,hit:false},sign:false,stop:'待机',causal:0,latency:null}};
+function reset(){sim=fresh();events=[];zoom=null;$('log').innerHTML='';$('sign').classList.remove('off');$('signText').textContent='营业中';$('pauseBtn').textContent='暂停';$('releaseBtn').disabled=false;$('lockBtn').classList.remove('active');$('barrierBtn').classList.remove('active');$('lockBtn').disabled=false;$('barrierBtn').disabled=false;log('system.reset','系统','约束与声音已清除','constraint');draw();updateUI()}
+function log(name,body,detail='',kind='contact'){const e={time:+sim.t.toFixed(2),name,body,detail,kind};events.push(e);const el=document.createElement('div');el.className='log-entry';el.innerHTML=`<span class="time">${e.time.toFixed(2)}s</span> <b>${name}</b><br><span>${body}${detail?' · '+detail:''}</span>`;$('log').prepend(el)}
+function start(){if(sim.running)return;const presetLock=sim.seesaw.locked,presetBarrier=sim.barrier;sim=fresh();sim.seesaw.locked=presetLock;sim.barrier=presetBarrier;sim.height=+$('heightRange').value/100;sim.g=$('gravityToggle').checked?260:520;sim.running=true;log('release.marble','释放第一颗球',`高度 ${Math.round(sim.height*100)}%`,'constraint');$('releaseBtn').disabled=true;updateUI()}
+function contact(name,body,detail){sim.causal++;log(name,body,detail,'contact')}
+function tick(dt){if(!sim.running||sim.paused)return;sim.t+=dt;const g=sim.g;
+ // marble down a visible incline; no clock-based handoff
+ if(!sim.marble.contact){sim.marble.v+=g*0.43*dt;sim.marble.x+=sim.marble.v*0.43*dt;sim.marble.y=116+(sim.marble.x-160)*0.54; if(sim.marble.x>=330){sim.marble.x=330;sim.marble.contact=true;sim.marble.v*=.35;contact('marble.contact seesaw','弹珠撞击跷跷板',`v=${sim.marble.v.toFixed(1)}`);sim.stop='跷跷板'}}
+ if(sim.marble.contact&&!sim.seesaw.tripped){if(sim.seesaw.locked){sim.marble.v*=.95;sim.stop='锁定：跷跷板';}else{sim.seesaw.omega+=1.9*dt;sim.seesaw.angle=Math.min(0.52,sim.seesaw.angle+sim.seesaw.omega*dt);if(sim.seesaw.angle>=.5){sim.seesaw.tripped=true;contact('seesaw.contact latch','跷跷板压下闸门闩','角度 30°');sim.stop='闸门'}}}
+ if(sim.seesaw.tripped&&!sim.gate.released){sim.gate.open=Math.min(1,sim.gate.open+dt*.75);if(sim.gate.open>=1){sim.gate.released=true;log('gate.constraint release','闸门打开，小车约束解除','真实门体角度达到阈值','constraint');sim.stop='小车'}}
+ if(sim.gate.released&&!sim.cart.stopped){sim.cart.started=true;sim.cart.v+=g*.3*dt;sim.cart.v*=.995;sim.cart.x+=sim.cart.v*dt;if(sim.barrier&&sim.cart.x>=815){sim.cart.x=815;sim.cart.v=0;sim.cart.stopped=true;contact('cart.contact barrier','小车撞上挡板','后续多米诺保持静止');sim.stop='挡板'}}
+ if(sim.cart.started&&!sim.cart.hitDomino&&!sim.cart.stopped&&sim.cart.x>=835){sim.cart.hitDomino=true;contact('cart.contact domino-01','小车撞倒第一块多米诺',`x=${sim.cart.x.toFixed(1)}`);sim.dominoes[0].falling=true;sim.stop='多米诺'}
+ for(let i=0;i<sim.dominoes.length;i++){const d=sim.dominoes[i];if(d.falling&&!d.done){d.angle=Math.min(1.35,d.angle+dt*3.4);if(d.angle>=1.3){d.done=true;if(i<sim.dominoes.length-1){sim.dominoes[i+1].falling=true;contact(`domino-${String(i+1).padStart(2,'0')}.contact`,`第 ${i+1} 块接触第 ${i+2} 块`,'角度阈值 75°')}else{sim.bell.hammer=1;contact('domino-07.contact hammer','末块推动预加载铃锤','弹簧释放')}}}}
+ if(sim.bell.hammer&&!sim.bell.hit){sim.bell.hammer=Math.max(0,sim.bell.hammer-dt*1.8);if(sim.bell.hammer<=.12){sim.bell.hit=true;const before=performance.now();playBell();sim.latency=+(performance.now()-before).toFixed(1);log('hammer.contact bell','锤头真实撞击铃体',`声音启动 Δt=${sim.latency}ms`,'sound');sim.sign=true;sim.stop='完成：铃响 / 下班';$('sign').classList.add('off');$('signText').textContent='下班了';}}
+ if(sim.t>30&&!sim.sign&&sim.stop!=='待机'&&!sim.paused){sim.running=false;sim.stop=`停在：${sim.stop}`;log('system.stop','能量耗尽',sim.stop,'constraint')}
+ updateUI();}
+function playBell(){try{audioCtx=audioCtx||new(AudioContext||webkitAudioContext)();const o=audioCtx.createOscillator(),gain=audioCtx.createGain();o.type='triangle';o.frequency.setValueAtTime(720,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(510,audioCtx.currentTime+.65);gain.gain.setValueAtTime(.0001,audioCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.22,audioCtx.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.72);o.connect(gain).connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.75)}catch(e){log('audio.blocked','浏览器阻止自动声音','请先点击释放按钮','sound')}}
+function updateUI(){$('stageValue').textContent=sim.stop;$('causalValue').textContent=sim.causal;$('latencyValue').textContent=sim.latency==null?'—':sim.latency+' ms';$('heightValue').textContent=$('heightRange').value+'%';$('pauseBtn').textContent=sim.paused?'继续':'暂停';}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke()}
+function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#203d32';ctx.fillRect(0,0,W,H);ctx.save();if(zoom){ctx.translate(W/2,H/2);ctx.scale(1.38,1.38);ctx.translate(-zoom.x,-zoom.y)}
+ // backdrop
+ ctx.fillStyle='#2d5142';ctx.fillRect(0,560,W,160);ctx.strokeStyle='#486b58';ctx.lineWidth=2;for(let x=0;x<W;x+=42){ctx.beginPath();ctx.moveTo(x,560);ctx.lineTo(x-80,720);ctx.stroke()}
+ ctx.strokeStyle='#b8d7bd';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(80,525);ctx.lineTo(1335,525);ctx.stroke();
+ label('A  重力坡道',70,58);ctx.strokeStyle='#c99543';ctx.lineWidth=14;ctx.beginPath();ctx.moveTo(120,90);ctx.lineTo(330,205);ctx.stroke();ctx.strokeStyle='#f3efe5';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(120,90);ctx.lineTo(330,205);ctx.stroke();
+ // marble
+ ctx.fillStyle='#d65c45';ctx.strokeStyle='#f3efe5';ctx.lineWidth=3;ctx.beginPath();ctx.arc(sim.marble.x,sim.marble.y,15,0,Math.PI*2);ctx.fill();ctx.stroke();caption('弹珠',sim.marble.x-18,sim.marble.y-25,'#fbf8f0');
+ // seesaw
+ ctx.save();ctx.translate(390,390);ctx.rotate(-sim.seesaw.angle);ctx.fillStyle='#c99543';ctx.strokeStyle='#f3efe5';ctx.lineWidth=3;roundRect(-108,-9,216,18,5);ctx.restore();ctx.fillStyle='#b8d7bd';ctx.beginPath();ctx.moveTo(390,400);ctx.lineTo(365,440);ctx.lineTo(415,440);ctx.closePath();ctx.fill();caption('跷跷板',350,465,sim.seesaw.locked?'#d65c45':'#fbf8f0');
+ // gate
+ ctx.strokeStyle='#c99543';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(555,525);ctx.lineTo(555,330);ctx.stroke();ctx.save();ctx.translate(555,330);ctx.rotate(-sim.gate.open*1.2);ctx.strokeStyle='#d65c45';ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(88,0);ctx.stroke();ctx.restore();caption('闸门',535,300,'#fbf8f0');
+ // cart
+ ctx.fillStyle='#b8d7bd';ctx.strokeStyle='#18221d';ctx.lineWidth=3;roundRect(sim.cart.x-42,480,84,38,8);ctx.fillStyle='#18221d';ctx.beginPath();ctx.arc(sim.cart.x-22,523,9,0,Math.PI*2);ctx.arc(sim.cart.x+22,523,9,0,Math.PI*2);ctx.fill();caption('小车',sim.cart.x-18,470,'#fbf8f0');
+ // barrier
+ if(sim.barrier){ctx.fillStyle='#d65c45';ctx.strokeStyle='#fbf8f0';ctx.lineWidth=2;ctx.fillRect(815,415,14,110);ctx.strokeRect(815,415,14,110);caption('挡板',798,398,'#d65c45')}
+ // dominoes
+ sim.dominoes.forEach((d,i)=>{ctx.save();ctx.translate(d.x,525);ctx.rotate(d.angle);ctx.fillStyle=i===0&&sim.cart.hitDomino?'#d65c45':'#c99543';ctx.strokeStyle='#f3efe5';ctx.lineWidth=2;roundRect(-7,-62,14,62,3);ctx.restore()});caption('多米诺',880,445,'#fbf8f0');
+ // bell
+ ctx.fillStyle='#c99543';ctx.strokeStyle='#f3efe5';ctx.lineWidth=3;ctx.beginPath();ctx.arc(1195,345,58,Math.PI,0);ctx.lineTo(1253,395);ctx.lineTo(1137,395);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#d65c45';ctx.beginPath();ctx.arc(1195,395,10,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(1195,330);ctx.rotate(sim.bell.hammer?-.55:0);ctx.strokeStyle='#b8d7bd';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-48,70);ctx.stroke();ctx.restore();caption('铃',1178,440,sim.bell.hit?'#d65c45':'#fbf8f0');
+ // status rail
+ ctx.fillStyle='#f3efe5';ctx.font='500 12px DM Mono';ctx.fillText('CAUSE → EFFECT',72,625);ctx.fillStyle='#b8d7bd';ctx.font='12px Space Grotesk';ctx.fillText('每一次推进，都来自上一件物体的真实接触。',72,650);
+ if(zoom){ctx.restore();ctx.fillStyle='rgba(24,34,29,.82)';ctx.fillRect(18,18,120,28);ctx.fillStyle='#fbf8f0';ctx.font='11px DM Mono';ctx.fillText('局部放大 · 点击退出',28,36)}}
+function label(t,x,y){ctx.fillStyle='#b8d7bd';ctx.font='500 11px DM Mono';ctx.fillText(t,x,y)}function caption(t,x,y,c){ctx.fillStyle=c;ctx.font='500 12px Space Grotesk';ctx.fillText(t,x,y)}
+function frame(ts){const dt=Math.min(.032,(ts-lastFrame)/1000||0);lastFrame=ts;tick(dt);draw();requestAnimationFrame(frame)}
+$('releaseBtn').onclick=()=>{start();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume()};$('pauseBtn').onclick=()=>{if(!sim.running)return;sim.paused=!sim.paused;updateUI()};$('resetBtn').onclick=reset;
+$('lockBtn').onclick=()=>{if(sim.running&&sim.marble.x<320&&!sim.marble.contact){sim.seesaw.locked=true;$('lockBtn').classList.add('active');log('seesaw.constraint lock','跷跷板已锁住','在首个接触之前建立','constraint')}else if(!sim.running){sim.seesaw.locked=true;$('lockBtn').classList.add('active');log('seesaw.constraint lock','将于释放后保持锁定','干预已预置','constraint')}else{log('intervention.missed','锁定未执行','弹珠已抵达节点','constraint')}updateUI()};
+$('barrierBtn').onclick=()=>{if(sim.running&&sim.cart.x<800){sim.barrier=true;$('barrierBtn').classList.add('active');log('barrier.inserted','挡板插入轨道','等待小车真实碰撞','constraint')}else if(!sim.running){sim.barrier=true;$('barrierBtn').classList.add('active');log('barrier.inserted','将于释放后出现在轨道','干预已预置','constraint')}else{log('intervention.missed','挡板未执行','小车已进入多米诺区','constraint')}updateUI()};
+$('gravityToggle').onchange=()=>{sim.g=$('gravityToggle').checked?260:520;log('parameter.gravity','重力参数改变',sim.g===260?'0.5×':'1.0×','constraint')};$('heightRange').oninput=updateUI;$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({events,diagnostics:{stop:sim.stop,causal:sim.causal,latency:sim.latency}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mechanical-chain-log.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+canvas.onclick=e=>{const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(zoom){zoom=null;return}const p=parts.find(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h);if(p)zoom={x:p.x+p.w/2,y:p.y+p.h/2}};
+reset();requestAnimationFrame(frame);
+</script>
+</body>
+</html>

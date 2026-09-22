@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一颗弹珠，让整间实验室下班 · 机械连锁装置</title>
+<style>
+  :root {
+    --bg: #10141c;
+    --panel: #171d29;
+    --panel2: #1c2432;
+    --line: #2a3446;
+    --ink: #d8e0ee;
+    --dim: #8a96ab;
+    --accent: #e8b64c;
+    --accent2: #e05252;
+    --ok: #5fbf77;
+    --warn: #e0a052;
+    --bad: #e05252;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---------- top bar ---------- */
+  #topbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  #topbar h1 { font-size: 15px; font-weight: 600; letter-spacing: .5px; white-space: nowrap; }
+  #topbar h1 .sub { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  #stages { display: flex; gap: 4px; flex-wrap: wrap; }
+  .chip {
+    padding: 2px 9px; border-radius: 999px; font-size: 12px;
+    background: var(--panel2); border: 1px solid var(--line); color: var(--dim);
+    transition: all .25s;
+  }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #20180a; font-weight: 600; }
+  .chip.done { color: var(--ok); border-color: #2f5b3c; }
+  #stats { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+  #stats b { color: var(--ink); font-weight: 600; }
+  #stats .bad b { color: var(--bad); }
+
+  /* ---------- main ---------- */
+  #main { flex: 1; display: flex; min-height: 0; }
+  #canvasWrap { flex: 1; position: relative; min-width: 0; background: #0b0e14; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  #hint {
+    position: absolute; left: 12px; bottom: 10px; font-size: 11px; color: #55617a;
+    background: rgba(10,13,20,.6); padding: 3px 8px; border-radius: 6px; pointer-events: none;
+  }
+
+  /* ---------- sidebar ---------- */
+  #side {
+    width: 380px; background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .sect { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .sect h2 { font-size: 12px; color: var(--dim); font-weight: 600; margin-bottom: 8px; letter-spacing: 1px; }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover:not(:disabled) { background: #232d40; border-color: #3a4a66; }
+  button:disabled { opacity: .38; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #20180a; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #f2c561; }
+  button.danger { border-color: #6b3a3a; }
+  button.armable.armed { border-color: var(--ok); color: var(--ok); }
+  .viewbtn { padding: 4px 8px; font-size: 12px; }
+  .heightctl { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--dim); }
+  .heightctl b { color: var(--accent); font-size: 14px; min-width: 48px; text-align: center; }
+
+  /* ---------- log ---------- */
+  #logsect { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #logfilters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .fchip { padding: 1px 7px; font-size: 11px; border-radius: 4px; cursor: pointer; user-select: none;
+           background: var(--panel2); border: 1px solid var(--line); color: var(--dim); }
+  .fchip.on { color: var(--ink); border-color: var(--accent); }
+  #log {
+    flex: 1; overflow-y: auto; font: 11.5px/1.55 ui-monospace, Menlo, Consolas, monospace;
+    background: #0d1119; border: 1px solid var(--line); border-radius: 6px; padding: 6px;
+  }
+  #log .row { display: flex; gap: 6px; padding: 1px 2px; border-bottom: 1px solid #131926; }
+  #log .t { color: #55617a; flex: 0 0 58px; }
+  #log .k { flex: 0 0 64px; text-align: center; border-radius: 3px; font-size: 10px; height: 15px; margin-top: 1.5px; }
+  #log .m { color: #b9c4d8; word-break: break-all; }
+  .k-state { background: #274a63; color: #9fd0f0; }
+  .k-mechanism { background: #3d5a2e; color: #b5e39a; }
+  .k-collision { background: #333; color: #aaa; }
+  .k-intervention { background: #5a4520; color: #f0cf8a; }
+  .k-diag { background: #5a2323; color: #f0a0a0; }
+  .k-op { background: #3a2d5a; color: #c5b3f0; }
+  .k-bell { background: #6b5310; color: #ffd75e; font-weight: 700; }
+  .k-sign { background: #205a4a; color: #8af0d2; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <h1>🔮 一颗弹珠，让整间实验室下班<span class="sub">桌面机械连锁 · 全链路真实碰撞驱动</span></h1>
+    <nav id="stages"></nav>
+    <div id="stats">
+      <span>停点 <b id="stStop">待释放</b></span>
+      <span class="bad">无因果 <b id="stAcausal">0</b></span>
+      <span>碰撞→声音 <b id="stSnd">—</b></span>
+      <span>碰撞 <b id="stCol">0</b></span>
+      <span>仿真 <b id="stTime">0.0s</b></span>
+    </div>
+  </header>
+
+  <div id="main">
+    <div id="canvasWrap">
+      <canvas id="cv"></canvas>
+      <div id="hint">滚轮缩放 · 拖拽平移 · 空格暂停 · R 释放 · L 锁跷跷板 · B 插挡板 · G 重力 · [ ] 高度</div>
+    </div>
+
+    <aside id="side">
+      <section class="sect">
+        <h2>控制</h2>
+        <div class="btnrow">
+          <button id="btnRelease" class="primary">释放小球 (R)</button>
+          <button id="btnPause">暂停 (空格)</button>
+          <button id="btnReset" class="danger">重置</button>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button id="btnLock" class="armable">🔒 锁定跷跷板 (L)</button>
+          <button id="btnBaffle" class="armable">🧱 插入挡板 (B)</button>
+          <button id="btnGravity">⚖️ 重力 ×0.5 (G)</button>
+        </div>
+        <div class="heightctl">
+          释放高度
+          <button id="btnHminus">−5%</button>
+          <b id="heightVal">100%</b>
+          <button id="btnHplus">+5%</button>
+          <span>（影响初始重力势能，±5% 内链条均可完成）</span>
+        </div>
+      </section>
+
+      <section class="sect">
+        <h2>视角（一镜全景 · 可缩放局部）</h2>
+        <div class="btnrow" id="views">
+          <button class="viewbtn" data-v="all">全景</button>
+          <button class="viewbtn" data-v="ramp">坡道·跷跷板</button>
+          <button class="viewbtn" data-v="gate">闸门</button>
+          <button class="viewbtn" data-v="track">小车轨道</button>
+          <button class="viewbtn" data-v="domino">多米诺</button>
+          <button class="viewbtn" data-v="bell">敲铃·指示牌</button>
+        </div>
+      </section>
+
+      <section class="sect" id="logsect">
+        <h2>事件日志（只由真实碰撞/状态量产生）<button id="btnExport" style="float:right;padding:1px 8px;font-size:11px">导出 JSON</button></h2>
+        <div id="logfilters"></div>
+        <div id="log"></div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>/*!
+ * matter-js 0.20.0 by @liabru
+ * http://brm.io/matter-js/
+ * License MIT
+ */
+!function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t():"function"==typeof define&&define.amd?define("Matter",[],t):"object"==typeof exports?exports.Matter=t():e.Matter=t()}(this,(function(){return function(e){var t={};function n(o){if(t[o])return t[o].exports;var i=t[o]={i:o,l:!1,exports:{}};return e[o].call(i.exports,i,i.exports,n),i.l=!0,i.exports}return n.m=e,n.c=t,n.d=function(e,t,o){n.o(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:o})},n.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},n.t=function(e,t){if(1&t&&(e=n(e)),8&t)return e;if(4&t&&"object"==typeof e&&e&&e.__esModule)return e;var o=Object.create(null);if(n.r(o),Object.defineProperty(o,"default",{enumerable:!0,value:e}),2&t&&"string"!=typeof e)for(var i in e)n.d(o,i,function(t){return e[t]}.bind(null,i));return o},n.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return n.d(t,"a",t),t},n.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},n.p="",n(n.s=20)}([function(e,t){var n={};e.exports=n,function(){n._baseDelta=1e3/60,n._nextId=0,n._seed=0,n._nowStartTime=+new Date,n._warnedOnce={},n._decomp=null,n.extend=function(e,t){var o,i;"boolean"==typeof t?(o=2,i=t):(o=1,i=!0);for(var r=o;r<arguments.length;r++){var a=arguments[r];if(a)for(var s in a)i&&a[s]&&a[s].constructor===Object?e[s]&&e[s].constructor!==Object?e[s]=a[s]:(e[s]=e[s]||{},n.extend(e[s],i,a[s])):e[s]=a[s]}return e},n.clone=function(e,t){return n.extend({},t,e)},n.keys=function(e){if(Object.keys)return Object.keys(e);var t=[];for(var n in e)t.push(n);return t},n.values=function(e){var t=[];if(Object.keys){for(var n=Object.keys(e),o=0;o<n.length;o++)t.push(e[n[o]]);return t}for(var i in e)t.push(e[i]);return t},n.get=function(e,t,n,o){t=t.split(".").slice(n,o);for(var i=0;i<t.length;i+=1)e=e[t[i]];return e},n.set=function(e,t,o,i,r){var a=t.split(".").slice(i,r);return n.get(e,t,0,-1)[a[a.length-1]]=o,o},n.shuffle=function(e){for(var t=e.length-1;t>0;t--){var o=Math.floor(n.random()*(t+1)),i=e[t];e[t]=e[o],e[o]=i}return e},n.choose=function(e){return e[Math.floor(n.random()*e.length)]},n.isElement=function(e){return"undefined"!=typeof HTMLElement?e instanceof HTMLElement:!!(e&&e.nodeType&&e.nodeName)},n.isArray=function(e){return"[object Array]"===Object.prototype.toString.call(e)},n.isFunction=function(e){return"function"==typeof e},n.isPlainObject=function(e){return"object"==typeof e&&e.constructor===Object},n.isString=function(e){return"[object String]"===toString.call(e)},n.clamp=function(e,t,n){return e<t?t:e>n?n:e},n.sign=function(e){return e<0?-1:1},n.now=function(){if("undefined"!=typeof window&&window.performance){if(window.performance.now)return window.performance.now();if(window.performance.webkitNow)return window.performance.webkitNow()}return Date.now?Date.now():new Date-n._nowStartTime},n.random=function(t,n){return n=void 0!==n?n:1,(t=void 0!==t?t:0)+e()*(n-t)};var e=function(){return n._seed=(9301*n._seed+49297)%233280,n._seed/233280};n.colorToNumber=function(e){return 3==(e=e.replace("#","")).length&&(e=e.charAt(0)+e.charAt(0)+e.charAt(1)+e.charAt(1)+e.charAt(2)+e.charAt(2)),parseInt(e,16)},n.logLevel=1,n.log=function(){console&&n.logLevel>0&&n.logLevel<=3&&console.log.apply(console,["matter-js:"].concat(Array.prototype.slice.call(arguments)))},n.info=function(){console&&n.logLevel>0&&n.logLevel<=2&&console.info.apply(console,["matter-js:"].concat(Array.prototype.slice.call(arguments)))},n.warn=function(){console&&n.logLevel>0&&n.logLevel<=3&&console.warn.apply(console,["matter-js:"].concat(Array.prototype.slice.call(arguments)))},n.warnOnce=function(){var e=Array.prototype.slice.call(arguments).join(" ");n._warnedOnce[e]||(n.warn(e),n._warnedOnce[e]=!0)},n.deprecated=function(e,t,o){e[t]=n.chain((function(){n.warnOnce("🔅 deprecated 🔅",o)}),e[t])},n.nextId=function(){return n._nextId++},n.indexOf=function(e,t){if(e.indexOf)return e.indexOf(t);for(var n=0;n<e.length;n++)if(e[n]===t)return n;return-1},n.map=function(e,t){if(e.map)return e.map(t);for(var n=[],o=0;o<e.length;o+=1)n.push(t(e[o]));return n},n.topologicalSort=function(e){var t=[],o=[],i=[];for(var r in e)o[r]||i[r]||n._topologicalSort(r,o,i,e,t);return t},n._topologicalSort=function(e,t,o,i,r){var a=i[e]||[];o[e]=!0;for(var s=0;s<a.length;s+=1){var l=a[s];o[l]||(t[l]||n._topologicalSort(l,t,o,i,r))}o[e]=!1,t[e]=!0,r.push(e)},n.chain=function(){for(var e=[],t=0;t<arguments.length;t+=1){var n=arguments[t];n._chained?e.push.apply(e,n._chained):e.push(n)}var o=function(){for(var t,n=new Array(arguments.length),o=0,i=arguments.length;o<i;o++)n[o]=arguments[o];for(o=0;o<e.length;o+=1){var r=e[o].apply(t,n);void 0!==r&&(t=r)}return t};return o._chained=e,o},n.chainPathBefore=function(e,t,o){return n.set(e,t,n.chain(o,n.get(e,t)))},n.chainPathAfter=function(e,t,o){return n.set(e,t,n.chain(n.get(e,t),o))},n.setDecomp=function(e){n._decomp=e},n.getDecomp=function(){var e=n._decomp;try{e||"undefined"==typeof window||(e=window.decomp),e||"undefined"==typeof global||(e=global.decomp)}catch(t){e=null}return e}}()},function(e,t){var n={};e.exports=n,n.create=function(e){var t={min:{x:0,y:0},max:{x:0,y:0}};return e&&n.update(t,e),t},n.update=function(e,t,n){e.min.x=1/0,e.max.x=-1/0,e.min.y=1/0,e.max.y=-1/0;for(var o=0;o<t.length;o++){var i=t[o];i.x>e.max.x&&(e.max.x=i.x),i.x<e.min.x&&(e.min.x=i.x),i.y>e.max.y&&(e.max.y=i.y),i.y<e.min.y&&(e.min.y=i.y)}n&&(n.x>0?e.max.x+=n.x:e.min.x+=n.x,n.y>0?e.max.y+=n.y:e.min.y+=n.y)},n.contains=function(e,t){return t.x>=e.min.x&&t.x<=e.max.x&&t.y>=e.min.y&&t.y<=e.max.y},n.overlaps=function(e,t){return e.min.x<=t.max.x&&e.max.x>=t.min.x&&e.max.y>=t.min.y&&e.min.y<=t.max.y},n.translate=function(e,t){e.min.x+=t.x,e.max.x+=t.x,e.min.y+=t.y,e.max.y+=t.y},n.shift=function(e,t){var n=e.max.x-e.min.x,o=e.max.y-e.min.y;e.min.x=t.x,e.max.x=t.x+n,e.min.y=t.y,e.max.y=t.y+o}},function(e,t){var n={};e.exports=n,n.create=function(e,t){return{x:e||0,y:t||0}},n.clone=function(e){return{x:e.x,y:e.y}},n.magnitude=function(e){return Math.sqrt(e.x*e.x+e.y*e.y)},n.magnitudeSquared=function(e){return e.x*e.x+e.y*e.y},n.rotate=function(e,t,n){var o=Math.cos(t),i=Math.sin(t);n||(n={});var r=e.x*o-e.y*i;return n.y=e.x*i+e.y*o,n.x=r,n},n.rotateAbout=function(e,t,n,o){var i=Math.cos(t),r=Math.sin(t);o||(o={});var a=n.x+((e.x-n.x)*i-(e.y-n.y)*r);return o.y=n.y+((e.x-n.x)*r+(e.y-n.y)*i),o.x=a,o},n.normalise=function(e){var t=n.magnitude(e);return 0===t?{x:0,y:0}:{x:e.x/t,y:e.y/t}},n.dot=function(e,t){return e.x*t.x+e.y*t.y},n.cross=function(e,t){return e.x*t.y-e.y*t.x},n.cross3=function(e,t,n){return(t.x-e.x)*(n.y-e.y)-(t.y-e.y)*(n.x-e.x)},n.add=function(e,t,n){return n||(n={}),n.x=e.x+t.x,n.y=e.y+t.y,n},n.sub=function(e,t,n){return n||(n={}),n.x=e.x-t.x,n.y=e.y-t.y,n},n.mult=function(e,t){return{x:e.x*t,y:e.y*t}},n.div=function(e,t){return{x:e.x/t,y:e.y/t}},n.perp=function(e,t){return{x:(t=!0===t?-1:1)*-e.y,y:t*e.x}},n.neg=function(e){return{x:-e.x,y:-e.y}},n.angle=function(e,t){return Math.atan2(t.y-e.y,t.x-e.x)},n._temp=[n.create(),n.create(),n.create(),n.create(),n.create(),n.create()]},function(e,t,n){var o={};e.exports=o;var i=n(2),r=n(0);o.create=function(e,t){for(var n=[],o=0;o<e.length;o++){var i=e[o],r={x:i.x,y:i.y,index:o,body:t,isInternal:!1};n.push(r)}return n},o.fromPath=function(e,t){var n=[];return e.replace(/L?\s*([-\d.e]+)[\s,]*([-\d.e]+)*/gi,(function(e,t,o){n.push({x:parseFloat(t),y:parseFloat(o)})})),o.create(n,t)},o.centre=function(e){for(var t,n,r,a=o.area(e,!0),s={x:0,y:0},l=0;l<e.length;l++)r=(l+1)%e.length,t=i.cross(e[l],e[r]),n=i.mult(i.add(e[l],e[r]),t),s=i.add(s,n);return i.div(s,6*a)},o.mean=function(e){for(var t={x:0,y:0},n=0;n<e.length;n++)t.x+=e[n].x,t.y+=e[n].y;return i.div(t,e.length)},o.area=function(e,t){for(var n=0,o=e.length-1,i=0;i<e.length;i++)n+=(e[o].x-e[i].x)*(e[o].y+e[i].y),o=i;return t?n/2:Math.abs(n)/2},o.inertia=function(e,t){for(var n,o,r=0,a=0,s=e,l=0;l<s.length;l++)o=(l+1)%s.length,r+=(n=Math.abs(i.cross(s[o],s[l])))*(i.dot(s[o],s[o])+i.dot(s[o],s[l])+i.dot(s[l],s[l])),a+=n;return t/6*(r/a)},o.translate=function(e,t,n){n=void 0!==n?n:1;var o,i=e.length,r=t.x*n,a=t.y*n;for(o=0;o<i;o++)e[o].x+=r,e[o].y+=a;return e},o.rotate=function(e,t,n){if(0!==t){var o,i,r,a,s=Math.cos(t),l=Math.sin(t),c=n.x,u=n.y,d=e.length;for(a=0;a<d;a++)i=(o=e[a]).x-c,r=o.y-u,o.x=c+(i*s-r*l),o.y=u+(i*l+r*s);return e}},o.contains=function(e,t){for(var n,o=t.x,i=t.y,r=e.length,a=e[r-1],s=0;s<r;s++){if(n=e[s],(o-a.x)*(n.y-a.y)+(i-a.y)*(a.x-n.x)>0)return!1;a=n}return!0},o.scale=function(e,t,n,r){if(1===t&&1===n)return e;var a,s;r=r||o.centre(e);for(var l=0;l<e.length;l++)a=e[l],s=i.sub(a,r),e[l].x=r.x+s.x*t,e[l].y=r.y+s.y*n;return e},o.chamfer=function(e,t,n,o,a){t="number"==typeof t?[t]:t||[8],n=void 0!==n?n:-1,o=o||2,a=a||14;for(var s=[],l=0;l<e.length;l++){var c=e[l-1>=0?l-1:e.length-1],u=e[l],d=e[(l+1)%e.length],p=t[l<t.length?l:t.length-1];if(0!==p){var f=i.normalise({x:u.y-c.y,y:c.x-u.x}),v=i.normalise({x:d.y-u.y,y:u.x-d.x}),m=Math.sqrt(2*Math.pow(p,2)),y=i.mult(r.clone(f),p),g=i.normalise(i.mult(i.add(f,v),.5)),x=i.sub(u,i.mult(g,m)),h=n;-1===n&&(h=1.75*Math.pow(p,.32)),(h=r.clamp(h,o,a))%2==1&&(h+=1);for(var b=Math.acos(i.dot(f,v))/h,S=0;S<h;S++)s.push(i.add(i.rotate(y,b*S),x))}else s.push(u)}return s},o.clockwiseSort=function(e){var t=o.mean(e);return e.sort((function(e,n){return i.angle(t,e)-i.angle(t,n)})),e},o.isConvex=function(e){var t,n,o,i,r=0,a=e.length;if(a<3)return null;for(t=0;t<a;t++)if(o=(t+2)%a,i=(e[n=(t+1)%a].x-e[t].x)*(e[o].y-e[n].y),(i-=(e[n].y-e[t].y)*(e[o].x-e[n].x))<0?r|=1:i>0&&(r|=2),3===r)return!1;return 0!==r||null},o.hull=function(e){var t,n,o=[],r=[];for((e=e.slice(0)).sort((function(e,t){var n=e.x-t.x;return 0!==n?n:e.y-t.y})),n=0;n<e.length;n+=1){for(t=e[n];r.length>=2&&i.cross3(r[r.length-2],r[r.length-1],t)<=0;)r.pop();r.push(t)}for(n=e.length-1;n>=0;n-=1){for(t=e[n];o.length>=2&&i.cross3(o[o.length-2],o[o.length-1],t)<=0;)o.pop();o.push(t)}return o.pop(),r.pop(),o.concat(r)}},function(e,t,n){var o={};e.exports=o;var i=n(3),r=n(2),a=n(7),s=n(0),l=n(1),c=n(11);!function(){o._timeCorrection=!0,o._inertiaScale=4,o._nextCollidingGroupId=1,o._nextNonCollidingGroupId=-1,o._nextCategory=1,o._baseDelta=1e3/60,o.create=function(t){var n={id:s.nextId(),type:"body",label:"Body",parts:[],plugin:{},angle:0,vertices:i.fromPath("L 0 0 L 40 0 L 40 40 L 0 40"),position:{x:0,y:0},force:{x:0,y:0},torque:0,positionImpulse:{x:0,y:0},constraintImpulse:{x:0,y:0,angle:0},totalContacts:0,speed:0,angularSpeed:0,velocity:{x:0,y:0},angularVelocity:0,isSensor:!1,isStatic:!1,isSleeping:!1,motion:0,sleepThreshold:60,density:.001,restitution:0,friction:.1,frictionStatic:.5,frictionAir:.01,collisionFilter:{category:1,mask:4294967295,group:0},slop:.05,timeScale:1,render:{visible:!0,opacity:1,strokeStyle:null,fillStyle:null,lineWidth:null,sprite:{xScale:1,yScale:1,xOffset:0,yOffset:0}},events:null,bounds:null,chamfer:null,circleRadius:0,positionPrev:null,anglePrev:0,parent:null,axes:null,area:0,mass:0,inertia:0,deltaTime:1e3/60,_original:null},o=s.extend(n,t);return e(o,t),o},o.nextGroup=function(e){return e?o._nextNonCollidingGroupId--:o._nextCollidingGroupId++},o.nextCategory=function(){return o._nextCategory=o._nextCategory<<1,o._nextCategory};var e=function(e,t){t=t||{},o.set(e,{bounds:e.bounds||l.create(e.vertices),positionPrev:e.positionPrev||r.clone(e.position),anglePrev:e.anglePrev||e.angle,vertices:e.vertices,parts:e.parts||[e],isStatic:e.isStatic,isSleeping:e.isSleeping,parent:e.parent||e}),i.rotate(e.vertices,e.angle,e.position),c.rotate(e.axes,e.angle),l.update(e.bounds,e.vertices,e.velocity),o.set(e,{axes:t.axes||e.axes,area:t.area||e.area,mass:t.mass||e.mass,inertia:t.inertia||e.inertia});var n=e.isStatic?"#14151f":s.choose(["#f19648","#f5d259","#f55a3c","#063e7b","#ececd1"]),a=e.isStatic?"#555":"#ccc",u=e.isStatic&&null===e.render.fillStyle?1:0;e.render.fillStyle=e.render.fillStyle||n,e.render.strokeStyle=e.render.strokeStyle||a,e.render.lineWidth=e.render.lineWidth||u,e.render.sprite.xOffset+=-(e.bounds.min.x-e.position.x)/(e.bounds.max.x-e.bounds.min.x),e.render.sprite.yOffset+=-(e.bounds.min.y-e.position.y)/(e.bounds.max.y-e.bounds.min.y)};o.set=function(e,t,n){var i;for(i in"string"==typeof t&&(i=t,(t={})[i]=n),t)if(Object.prototype.hasOwnProperty.call(t,i))switch(n=t[i],i){case"isStatic":o.setStatic(e,n);break;case"isSleeping":a.set(e,n);break;case"mass":o.setMass(e,n);break;case"density":o.setDensity(e,n);break;case"inertia":o.setInertia(e,n);break;case"vertices":o.setVertices(e,n);break;case"position":o.setPosition(e,n);break;case"angle":o.setAngle(e,n);break;case"velocity":o.setVelocity(e,n);break;case"angularVelocity":o.setAngularVelocity(e,n);break;case"speed":o.setSpeed(e,n);break;case"angularSpeed":o.setAngularSpeed(e,n);break;case"parts":o.setParts(e,n);break;case"centre":o.setCentre(e,n);break;default:e[i]=n}},o.setStatic=function(e,t){for(var n=0;n<e.parts.length;n++){var o=e.parts[n];t?(o.isStatic||(o._original={restitution:o.restitution,friction:o.friction,mass:o.mass,inertia:o.inertia,density:o.density,inverseMass:o.inverseMass,inverseInertia:o.inverseInertia}),o.restitution=0,o.friction=1,o.mass=o.inertia=o.density=1/0,o.inverseMass=o.inverseInertia=0,o.positionPrev.x=o.position.x,o.positionPrev.y=o.position.y,o.anglePrev=o.angle,o.angularVelocity=0,o.speed=0,o.angularSpeed=0,o.motion=0):o._original&&(o.restitution=o._original.restitution,o.friction=o._original.friction,o.mass=o._original.mass,o.inertia=o._original.inertia,o.density=o._original.density,o.inverseMass=o._original.inverseMass,o.inverseInertia=o._original.inverseInertia,o._original=null),o.isStatic=t}},o.setMass=function(e,t){var n=e.inertia/(e.mass/6);e.inertia=n*(t/6),e.inverseInertia=1/e.inertia,e.mass=t,e.inverseMass=1/e.mass,e.density=e.mass/e.area},o.setDensity=function(e,t){o.setMass(e,t*e.area),e.density=t},o.setInertia=function(e,t){e.inertia=t,e.inverseInertia=1/e.inertia},o.setVertices=function(e,t){t[0].body===e?e.vertices=t:e.vertices=i.create(t,e),e.axes=c.fromVertices(e.vertices),e.area=i.area(e.vertices),o.setMass(e,e.density*e.area);var n=i.centre(e.vertices);i.translate(e.vertices,n,-1),o.setInertia(e,o._inertiaScale*i.inertia(e.vertices,e.mass)),i.translate(e.vertices,e.position),l.update(e.bounds,e.vertices,e.velocity)},o.setParts=function(e,t,n){var r;for(t=t.slice(0),e.parts.length=0,e.parts.push(e),e.parent=e,r=0;r<t.length;r++){var a=t[r];a!==e&&(a.parent=e,e.parts.push(a))}if(1!==e.parts.length){if(n=void 0===n||n){var s=[];for(r=0;r<t.length;r++)s=s.concat(t[r].vertices);i.clockwiseSort(s);var l=i.hull(s),c=i.centre(l);o.setVertices(e,l),i.translate(e.vertices,c)}var u=o._totalProperties(e);e.area=u.area,e.parent=e,e.position.x=u.centre.x,e.position.y=u.centre.y,e.positionPrev.x=u.centre.x,e.positionPrev.y=u.centre.y,o.setMass(e,u.mass),o.setInertia(e,u.inertia),o.setPosition(e,u.centre)}},o.setCentre=function(e,t,n){n?(e.positionPrev.x+=t.x,e.positionPrev.y+=t.y,e.position.x+=t.x,e.position.y+=t.y):(e.positionPrev.x=t.x-(e.position.x-e.positionPrev.x),e.positionPrev.y=t.y-(e.position.y-e.positionPrev.y),e.position.x=t.x,e.position.y=t.y)},o.setPosition=function(e,t,n){var o=r.sub(t,e.position);n?(e.positionPrev.x=e.position.x,e.positionPrev.y=e.position.y,e.velocity.x=o.x,e.velocity.y=o.y,e.speed=r.magnitude(o)):(e.positionPrev.x+=o.x,e.positionPrev.y+=o.y);for(var a=0;a<e.parts.length;a++){var s=e.parts[a];s.position.x+=o.x,s.position.y+=o.y,i.translate(s.vertices,o),l.update(s.bounds,s.vertices,e.velocity)}},o.setAngle=function(e,t,n){var o=t-e.angle;n?(e.anglePrev=e.angle,e.angularVelocity=o,e.angularSpeed=Math.abs(o)):e.anglePrev+=o;for(var a=0;a<e.parts.length;a++){var s=e.parts[a];s.angle+=o,i.rotate(s.vertices,o,e.position),c.rotate(s.axes,o),l.update(s.bounds,s.vertices,e.velocity),a>0&&r.rotateAbout(s.position,o,e.position,s.position)}},o.setVelocity=function(e,t){var n=e.deltaTime/o._baseDelta;e.positionPrev.x=e.position.x-t.x*n,e.positionPrev.y=e.position.y-t.y*n,e.velocity.x=(e.position.x-e.positionPrev.x)/n,e.velocity.y=(e.position.y-e.positionPrev.y)/n,e.speed=r.magnitude(e.velocity)},o.getVelocity=function(e){var t=o._baseDelta/e.deltaTime;return{x:(e.position.x-e.positionPrev.x)*t,y:(e.position.y-e.positionPrev.y)*t}},o.getSpeed=function(e){return r.magnitude(o.getVelocity(e))},o.setSpeed=function(e,t){o.setVelocity(e,r.mult(r.normalise(o.getVelocity(e)),t))},o.setAngularVelocity=function(e,t){var n=e.deltaTime/o._baseDelta;e.anglePrev=e.angle-t*n,e.angularVelocity=(e.angle-e.anglePrev)/n,e.angularSpeed=Math.abs(e.angularVelocity)},o.getAngularVelocity=function(e){return(e.angle-e.anglePrev)*o._baseDelta/e.deltaTime},o.getAngularSpeed=function(e){return Math.abs(o.getAngularVelocity(e))},o.setAngularSpeed=function(e,t){o.setAngularVelocity(e,s.sign(o.getAngularVelocity(e))*t)},o.translate=function(e,t,n){o.setPosition(e,r.add(e.position,t),n)},o.rotate=function(e,t,n,i){if(n){var r=Math.cos(t),a=Math.sin(t),s=e.position.x-n.x,l=e.position.y-n.y;o.setPosition(e,{x:n.x+(s*r-l*a),y:n.y+(s*a+l*r)},i),o.setAngle(e,e.angle+t,i)}else o.setAngle(e,e.angle+t,i)},o.scale=function(e,t,n,r){var a=0,s=0;r=r||e.position;for(var u=0;u<e.parts.length;u++){var d=e.parts[u];i.scale(d.vertices,t,n,r),d.axes=c.fromVertices(d.vertices),d.area=i.area(d.vertices),o.setMass(d,e.density*d.area),i.translate(d.vertices,{x:-d.position.x,y:-d.position.y}),o.setInertia(d,o._inertiaScale*i.inertia(d.vertices,d.mass)),i.translate(d.vertices,{x:d.position.x,y:d.position.y}),u>0&&(a+=d.area,s+=d.inertia),d.position.x=r.x+(d.position.x-r.x)*t,d.position.y=r.y+(d.position.y-r.y)*n,l.update(d.bounds,d.vertices,e.velocity)}e.parts.length>1&&(e.area=a,e.isStatic||(o.setMass(e,e.density*a),o.setInertia(e,s))),e.circleRadius&&(t===n?e.circleRadius*=t:e.circleRadius=null)},o.update=function(e,t){var n=(t=(void 0!==t?t:1e3/60)*e.timeScale)*t,a=o._timeCorrection?t/(e.deltaTime||t):1,u=1-e.frictionAir*(t/s._baseDelta),d=(e.position.x-e.positionPrev.x)*a,p=(e.position.y-e.positionPrev.y)*a;e.velocity.x=d*u+e.force.x/e.mass*n,e.velocity.y=p*u+e.force.y/e.mass*n,e.positionPrev.x=e.position.x,e.positionPrev.y=e.position.y,e.position.x+=e.velocity.x,e.position.y+=e.velocity.y,e.deltaTime=t,e.angularVelocity=(e.angle-e.anglePrev)*u*a+e.torque/e.inertia*n,e.anglePrev=e.angle,e.angle+=e.angularVelocity;for(var f=0;f<e.parts.length;f++){var v=e.parts[f];i.translate(v.vertices,e.velocity),f>0&&(v.position.x+=e.velocity.x,v.position.y+=e.velocity.y),0!==e.angularVelocity&&(i.rotate(v.vertices,e.angularVelocity,e.position),c.rotate(v.axes,e.angularVelocity),f>0&&r.rotateAbout(v.position,e.angularVelocity,e.position,v.position)),l.update(v.bounds,v.vertices,e.velocity)}},o.updateVelocities=function(e){var t=o._baseDelta/e.deltaTime,n=e.velocity;n.x=(e.position.x-e.positionPrev.x)*t,n.y=(e.position.y-e.positionPrev.y)*t,e.speed=Math.sqrt(n.x*n.x+n.y*n.y),e.angularVelocity=(e.angle-e.anglePrev)*t,e.angularSpeed=Math.abs(e.angularVelocity)},o.applyForce=function(e,t,n){var o=t.x-e.position.x,i=t.y-e.position.y;e.force.x+=n.x,e.force.y+=n.y,e.torque+=o*n.y-i*n.x},o._totalProperties=function(e){for(var t={mass:0,area:0,inertia:0,centre:{x:0,y:0}},n=1===e.parts.length?0:1;n<e.parts.length;n++){var o=e.parts[n],i=o.mass!==1/0?o.mass:1;t.mass+=i,t.area+=o.area,t.inertia+=o.inertia,t.centre=r.add(t.centre,r.mult(o.position,i))}return t.centre=r.div(t.centre,t.mass),t}}()},function(e,t,n){var o={};e.exports=o;var i=n(0);o.on=function(e,t,n){for(var o,i=t.split(" "),r=0;r<i.length;r++)o=i[r],e.events=e.events||{},e.events[o]=e.events[o]||[],e.events[o].push(n);return n},o.off=function(e,t,n){if(t){"function"==typeof t&&(n=t,t=i.keys(e.events).join(" "));for(var o=t.split(" "),r=0;r<o.length;r++){var a=e.events[o[r]],s=[];if(n&&a)for(var l=0;l<a.length;l++)a[l]!==n&&s.push(a[l]);e.events[o[r]]=s}}else e.events={}},o.trigger=function(e,t,n){var o,r,a,s,l=e.events;if(l&&i.keys(l).length>0){n||(n={}),o=t.split(" ");for(var c=0;c<o.length;c++)if(a=l[r=o[c]]){(s=i.clone(n,!1)).name=r,s.source=e;for(var u=0;u<a.length;u++)a[u].apply(e,[s])}}}},function(e,t,n){var o={};e.exports=o;var i=n(5),r=n(0),a=n(1),s=n(4);o.create=function(e){return r.extend({id:r.nextId(),type:"composite",parent:null,isModified:!1,bodies:[],constraints:[],composites:[],label:"Composite",plugin:{},cache:{allBodies:null,allConstraints:null,allComposites:null}},e)},o.setModified=function(e,t,n,i){if(e.isModified=t,t&&e.cache&&(e.cache.allBodies=null,e.cache.allConstraints=null,e.cache.allComposites=null),n&&e.parent&&o.setModified(e.parent,t,n,i),i)for(var r=0;r<e.composites.length;r++){var a=e.composites[r];o.setModified(a,t,n,i)}},o.add=function(e,t){var n=[].concat(t);i.trigger(e,"beforeAdd",{object:t});for(var a=0;a<n.length;a++){var s=n[a];switch(s.type){case"body":if(s.parent!==s){r.warn("Composite.add: skipped adding a compound body part (you must add its parent instead)");break}o.addBody(e,s);break;case"constraint":o.addConstraint(e,s);break;case"composite":o.addComposite(e,s);break;case"mouseConstraint":o.addConstraint(e,s.constraint)}}return i.trigger(e,"afterAdd",{object:t}),e},o.remove=function(e,t,n){var r=[].concat(t);i.trigger(e,"beforeRemove",{object:t});for(var a=0;a<r.length;a++){var s=r[a];switch(s.type){case"body":o.removeBody(e,s,n);break;case"constraint":o.removeConstraint(e,s,n);break;case"composite":o.removeComposite(e,s,n);break;case"mouseConstraint":o.removeConstraint(e,s.constraint)}}return i.trigger(e,"afterRemove",{object:t}),e},o.addComposite=function(e,t){return e.composites.push(t),t.parent=e,o.setModified(e,!0,!0,!1),e},o.removeComposite=function(e,t,n){var i=r.indexOf(e.composites,t);if(-1!==i){var a=o.allBodies(t);o.removeCompositeAt(e,i);for(var s=0;s<a.length;s++)a[s].sleepCounter=0}if(n)for(s=0;s<e.composites.length;s++)o.removeComposite(e.composites[s],t,!0);return e},o.removeCompositeAt=function(e,t){return e.composites.splice(t,1),o.setModified(e,!0,!0,!1),e},o.addBody=function(e,t){return e.bodies.push(t),o.setModified(e,!0,!0,!1),e},o.removeBody=function(e,t,n){var i=r.indexOf(e.bodies,t);if(-1!==i&&(o.removeBodyAt(e,i),t.sleepCounter=0),n)for(var a=0;a<e.composites.length;a++)o.removeBody(e.composites[a],t,!0);return e},o.removeBodyAt=function(e,t){return e.bodies.splice(t,1),o.setModified(e,!0,!0,!1),e},o.addConstraint=function(e,t){return e.constraints.push(t),o.setModified(e,!0,!0,!1),e},o.removeConstraint=function(e,t,n){var i=r.indexOf(e.constraints,t);if(-1!==i&&o.removeConstraintAt(e,i),n)for(var a=0;a<e.composites.length;a++)o.removeConstraint(e.composites[a],t,!0);return e},o.removeConstraintAt=function(e,t){return e.constraints.splice(t,1),o.setModified(e,!0,!0,!1),e},o.clear=function(e,t,n){if(n)for(var i=0;i<e.composites.length;i++)o.clear(e.composites[i],t,!0);return t?e.bodies=e.bodies.filter((function(e){return e.isStatic})):e.bodies.length=0,e.constraints.length=0,e.composites.length=0,o.setModified(e,!0,!0,!1),e},o.allBodies=function(e){if(e.cache&&e.cache.allBodies)return e.cache.allBodies;for(var t=[].concat(e.bodies),n=0;n<e.composites.length;n++)t=t.concat(o.allBodies(e.composites[n]));return e.cache&&(e.cache.allBodies=t),t},o.allConstraints=function(e){if(e.cache&&e.cache.allConstraints)return e.cache.allConstraints;for(var t=[].concat(e.constraints),n=0;n<e.composites.length;n++)t=t.concat(o.allConstraints(e.composites[n]));return e.cache&&(e.cache.allConstraints=t),t},o.allComposites=function(e){if(e.cache&&e.cache.allComposites)return e.cache.allComposites;for(var t=[].concat(e.composites),n=0;n<e.composites.length;n++)t=t.concat(o.allComposites(e.composites[n]));return e.cache&&(e.cache.allComposites=t),t},o.get=function(e,t,n){var i,r;switch(n){case"body":i=o.allBodies(e);break;case"constraint":i=o.allConstraints(e);break;case"composite":i=o.allComposites(e).concat(e)}return i?0===(r=i.filter((function(e){return e.id.toString()===t.toString()}))).length?null:r[0]:null},o.move=function(e,t,n){return o.remove(e,t),o.add(n,t),e},o.rebase=function(e){for(var t=o.allBodies(e).concat(o.allConstraints(e)).concat(o.allComposites(e)),n=0;n<t.length;n++)t[n].id=r.nextId();return e},o.translate=function(e,t,n){for(var i=n?o.allBodies(e):e.bodies,r=0;r<i.length;r++)s.translate(i[r],t);return e},o.rotate=function(e,t,n,i){for(var r=Math.cos(t),a=Math.sin(t),l=i?o.allBodies(e):e.bodies,c=0;c<l.length;c++){var u=l[c],d=u.position.x-n.x,p=u.position.y-n.y;s.setPosition(u,{x:n.x+(d*r-p*a),y:n.y+(d*a+p*r)}),s.rotate(u,t)}return e},o.scale=function(e,t,n,i,r){for(var a=r?o.allBodies(e):e.bodies,l=0;l<a.length;l++){var c=a[l],u=c.position.x-i.x,d=c.position.y-i.y;s.setPosition(c,{x:i.x+u*t,y:i.y+d*n}),s.scale(c,t,n)}return e},o.bounds=function(e){for(var t=o.allBodies(e),n=[],i=0;i<t.length;i+=1){var r=t[i];n.push(r.bounds.min,r.bounds.max)}return a.create(n)}},function(e,t,n){var o={};e.exports=o;var i=n(4),r=n(5),a=n(0);o._motionWakeThreshold=.18,o._motionSleepThreshold=.08,o._minBias=.9,o.update=function(e,t){for(var n=t/a._baseDelta,r=o._motionSleepThreshold,s=0;s<e.length;s++){var l=e[s],c=i.getSpeed(l),u=i.getAngularSpeed(l),d=c*c+u*u;if(0===l.force.x&&0===l.force.y){var p=Math.min(l.motion,d),f=Math.max(l.motion,d);l.motion=o._minBias*p+(1-o._minBias)*f,l.sleepThreshold>0&&l.motion<r?(l.sleepCounter+=1,l.sleepCounter>=l.sleepThreshold/n&&o.set(l,!0)):l.sleepCounter>0&&(l.sleepCounter-=1)}else o.set(l,!1)}},o.afterCollisions=function(e){for(var t=o._motionSleepThreshold,n=0;n<e.length;n++){var i=e[n];if(i.isActive){var r=i.collision,a=r.bodyA.parent,s=r.bodyB.parent;if(!(a.isSleeping&&s.isSleeping||a.isStatic||s.isStatic)&&(a.isSleeping||s.isSleeping)){var l=a.isSleeping&&!a.isStatic?a:s,c=l===a?s:a;!l.isStatic&&c.motion>t&&o.set(l,!1)}}}},o.set=function(e,t){var n=e.isSleeping;t?(e.isSleeping=!0,e.sleepCounter=e.sleepThreshold,e.positionImpulse.x=0,e.positionImpulse.y=0,e.positionPrev.x=e.position.x,e.positionPrev.y=e.position.y,e.anglePrev=e.angle,e.speed=0,e.angularSpeed=0,e.motion=0,n||r.trigger(e,"sleepStart")):(e.isSleeping=!1,e.sleepCounter=0,n&&r.trigger(e,"sleepEnd"))}},function(e,t,n){var o={};e.exports=o;var i,r,a,s=n(3),l=n(9);i=[],r={overlap:0,axis:null},a={overlap:0,axis:null},o.create=function(e,t){return{pair:null,collided:!1,bodyA:e,bodyB:t,parentA:e.parent,parentB:t.parent,depth:0,normal:{x:0,y:0},tangent:{x:0,y:0},penetration:{x:0,y:0},supports:[null,null],supportCount:0}},o.collides=function(e,t,n){if(o._overlapAxes(r,e.vertices,t.vertices,e.axes),r.overlap<=0)return null;if(o._overlapAxes(a,t.vertices,e.vertices,t.axes),a.overlap<=0)return null;var i,c,u=n&&n.table[l.id(e,t)];u?i=u.collision:((i=o.create(e,t)).collided=!0,i.bodyA=e.id<t.id?e:t,i.bodyB=e.id<t.id?t:e,i.parentA=i.bodyA.parent,i.parentB=i.bodyB.parent),e=i.bodyA,t=i.bodyB,c=r.overlap<a.overlap?r:a;var d=i.normal,p=i.tangent,f=i.penetration,v=i.supports,m=c.overlap,y=c.axis,g=y.x,x=y.y;g*(t.position.x-e.position.x)+x*(t.position.y-e.position.y)>=0&&(g=-g,x=-x),d.x=g,d.y=x,p.x=-x,p.y=g,f.x=g*m,f.y=x*m,i.depth=m;var h=o._findSupports(e,t,d,1),b=0;if(s.contains(e.vertices,h[0])&&(v[b++]=h[0]),s.contains(e.vertices,h[1])&&(v[b++]=h[1]),b<2){var S=o._findSupports(t,e,d,-1);s.contains(t.vertices,S[0])&&(v[b++]=S[0]),b<2&&s.contains(t.vertices,S[1])&&(v[b++]=S[1])}return 0===b&&(v[b++]=h[0]),i.supportCount=b,i},o._overlapAxes=function(e,t,n,o){var i,r,a,s,l,c,u=t.length,d=n.length,p=t[0].x,f=t[0].y,v=n[0].x,m=n[0].y,y=o.length,g=Number.MAX_VALUE,x=0;for(l=0;l<y;l++){var h=o[l],b=h.x,S=h.y,w=p*b+f*S,A=v*b+m*S,P=w,B=A;for(c=1;c<u;c+=1)(s=t[c].x*b+t[c].y*S)>P?P=s:s<w&&(w=s);for(c=1;c<d;c+=1)(s=n[c].x*b+n[c].y*S)>B?B=s:s<A&&(A=s);if((i=(r=P-A)<(a=B-w)?r:a)<g&&(g=i,x=l,i<=0))break}e.axis=o[x],e.overlap=g},o._findSupports=function(e,t,n,o){var r,a,s,l=t.vertices,c=l.length,u=e.position.x,d=e.position.y,p=n.x*o,f=n.y*o,v=l[0],m=v,y=p*(u-m.x)+f*(d-m.y);for(s=1;s<c;s+=1)(a=p*(u-(m=l[s]).x)+f*(d-m.y))<y&&(y=a,v=m);return y=p*(u-(r=l[(c+v.index-1)%c]).x)+f*(d-r.y),p*(u-(m=l[(v.index+1)%c]).x)+f*(d-m.y)<y?(i[0]=v,i[1]=m,i):(i[0]=v,i[1]=r,i)}},function(e,t,n){var o={};e.exports=o;var i=n(16);o.create=function(e,t){var n=e.bodyA,r=e.bodyB,a={id:o.id(n,r),bodyA:n,bodyB:r,collision:e,contacts:[i.create(),i.create()],contactCount:0,separation:0,isActive:!0,isSensor:n.isSensor||r.isSensor,timeCreated:t,timeUpdated:t,inverseMass:0,friction:0,frictionStatic:0,restitution:0,slop:0};return o.update(a,e,t),a},o.update=function(e,t,n){var o=t.supports,i=t.supportCount,r=e.contacts,a=t.parentA,s=t.parentB;e.isActive=!0,e.timeUpdated=n,e.collision=t,e.separation=t.depth,e.inverseMass=a.inverseMass+s.inverseMass,e.friction=a.friction<s.friction?a.friction:s.friction,e.frictionStatic=a.frictionStatic>s.frictionStatic?a.frictionStatic:s.frictionStatic,e.restitution=a.restitution>s.restitution?a.restitution:s.restitution,e.slop=a.slop>s.slop?a.slop:s.slop,e.contactCount=i,t.pair=e;var l=o[0],c=r[0],u=o[1],d=r[1];d.vertex!==l&&c.vertex!==u||(r[1]=c,r[0]=c=d,d=r[1]),c.vertex=l,d.vertex=u},o.setActive=function(e,t,n){t?(e.isActive=!0,e.timeUpdated=n):(e.isActive=!1,e.contactCount=0)},o.id=function(e,t){return e.id<t.id?e.id.toString(36)+":"+t.id.toString(36):t.id.toString(36)+":"+e.id.toString(36)}},function(e,t,n){var o={};e.exports=o;var i=n(3),r=n(2),a=n(7),s=n(1),l=n(11),c=n(0);o._warming=.4,o._torqueDampen=1,o._minLength=1e-6,o.create=function(e){var t=e;t.bodyA&&!t.pointA&&(t.pointA={x:0,y:0}),t.bodyB&&!t.pointB&&(t.pointB={x:0,y:0});var n=t.bodyA?r.add(t.bodyA.position,t.pointA):t.pointA,o=t.bodyB?r.add(t.bodyB.position,t.pointB):t.pointB,i=r.magnitude(r.sub(n,o));t.length=void 0!==t.length?t.length:i,t.id=t.id||c.nextId(),t.label=t.label||"Constraint",t.type="constraint",t.stiffness=t.stiffness||(t.length>0?1:.7),t.damping=t.damping||0,t.angularStiffness=t.angularStiffness||0,t.angleA=t.bodyA?t.bodyA.angle:t.angleA,t.angleB=t.bodyB?t.bodyB.angle:t.angleB,t.plugin={};var a={visible:!0,lineWidth:2,strokeStyle:"#ffffff",type:"line",anchors:!0};return 0===t.length&&t.stiffness>.1?(a.type="pin",a.anchors=!1):t.stiffness<.9&&(a.type="spring"),t.render=c.extend(a,t.render),t},o.preSolveAll=function(e){for(var t=0;t<e.length;t+=1){var n=e[t],o=n.constraintImpulse;n.isStatic||0===o.x&&0===o.y&&0===o.angle||(n.position.x+=o.x,n.position.y+=o.y,n.angle+=o.angle)}},o.solveAll=function(e,t){for(var n=c.clamp(t/c._baseDelta,0,1),i=0;i<e.length;i+=1){var r=e[i],a=!r.bodyA||r.bodyA&&r.bodyA.isStatic,s=!r.bodyB||r.bodyB&&r.bodyB.isStatic;(a||s)&&o.solve(e[i],n)}for(i=0;i<e.length;i+=1)a=!(r=e[i]).bodyA||r.bodyA&&r.bodyA.isStatic,s=!r.bodyB||r.bodyB&&r.bodyB.isStatic,a||s||o.solve(e[i],n)},o.solve=function(e,t){var n=e.bodyA,i=e.bodyB,a=e.pointA,s=e.pointB;if(n||i){n&&!n.isStatic&&(r.rotate(a,n.angle-e.angleA,a),e.angleA=n.angle),i&&!i.isStatic&&(r.rotate(s,i.angle-e.angleB,s),e.angleB=i.angle);var l=a,c=s;if(n&&(l=r.add(n.position,a)),i&&(c=r.add(i.position,s)),l&&c){var u=r.sub(l,c),d=r.magnitude(u);d<o._minLength&&(d=o._minLength);var p,f,v,m,y,g=(d-e.length)/d,x=e.stiffness>=1||0===e.length?e.stiffness*t:e.stiffness*t*t,h=e.damping*t,b=r.mult(u,g*x),S=(n?n.inverseMass:0)+(i?i.inverseMass:0),w=S+((n?n.inverseInertia:0)+(i?i.inverseInertia:0));if(h>0){var A=r.create();v=r.div(u,d),y=r.sub(i&&r.sub(i.position,i.positionPrev)||A,n&&r.sub(n.position,n.positionPrev)||A),m=r.dot(v,y)}n&&!n.isStatic&&(f=n.inverseMass/S,n.constraintImpulse.x-=b.x*f,n.constraintImpulse.y-=b.y*f,n.position.x-=b.x*f,n.position.y-=b.y*f,h>0&&(n.positionPrev.x-=h*v.x*m*f,n.positionPrev.y-=h*v.y*m*f),p=r.cross(a,b)/w*o._torqueDampen*n.inverseInertia*(1-e.angularStiffness),n.constraintImpulse.angle-=p,n.angle-=p),i&&!i.isStatic&&(f=i.inverseMass/S,i.constraintImpulse.x+=b.x*f,i.constraintImpulse.y+=b.y*f,i.position.x+=b.x*f,i.position.y+=b.y*f,h>0&&(i.positionPrev.x+=h*v.x*m*f,i.positionPrev.y+=h*v.y*m*f),p=r.cross(s,b)/w*o._torqueDampen*i.inverseInertia*(1-e.angularStiffness),i.constraintImpulse.angle+=p,i.angle+=p)}}},o.postSolveAll=function(e){for(var t=0;t<e.length;t++){var n=e[t],c=n.constraintImpulse;if(!(n.isStatic||0===c.x&&0===c.y&&0===c.angle)){a.set(n,!1);for(var u=0;u<n.parts.length;u++){var d=n.parts[u];i.translate(d.vertices,c),u>0&&(d.position.x+=c.x,d.position.y+=c.y),0!==c.angle&&(i.rotate(d.vertices,c.angle,n.position),l.rotate(d.axes,c.angle),u>0&&r.rotateAbout(d.position,c.angle,n.position,d.position)),s.update(d.bounds,d.vertices,n.velocity)}c.angle*=o._warming,c.x*=o._warming,c.y*=o._warming}}},o.pointAWorld=function(e){return{x:(e.bodyA?e.bodyA.position.x:0)+(e.pointA?e.pointA.x:0),y:(e.bodyA?e.bodyA.position.y:0)+(e.pointA?e.pointA.y:0)}},o.pointBWorld=function(e){return{x:(e.bodyB?e.bodyB.position.x:0)+(e.pointB?e.pointB.x:0),y:(e.bodyB?e.bodyB.position.y:0)+(e.pointB?e.pointB.y:0)}},o.currentLength=function(e){var t=(e.bodyA?e.bodyA.position.x:0)+(e.pointA?e.pointA.x:0),n=(e.bodyA?e.bodyA.position.y:0)+(e.pointA?e.pointA.y:0),o=t-((e.bodyB?e.bodyB.position.x:0)+(e.pointB?e.pointB.x:0)),i=n-((e.bodyB?e.bodyB.position.y:0)+(e.pointB?e.pointB.y:0));return Math.sqrt(o*o+i*i)}},function(e,t,n){var o={};e.exports=o;var i=n(2),r=n(0);o.fromVertices=function(e){for(var t={},n=0;n<e.length;n++){var o=(n+1)%e.length,a=i.normalise({x:e[o].y-e[n].y,y:e[n].x-e[o].x}),s=0===a.y?1/0:a.x/a.y;t[s=s.toFixed(3).toString()]=a}return r.values(t)},o.rotate=function(e,t){if(0!==t)for(var n=Math.cos(t),o=Math.sin(t),i=0;i<e.length;i++){var r,a=e[i];r=a.x*n-a.y*o,a.y=a.x*o+a.y*n,a.x=r}}},function(e,t,n){var o={};e.exports=o;var i=n(3),r=n(0),a=n(4),s=n(1),l=n(2);o.rectangle=function(e,t,n,o,s){s=s||{};var l={label:"Rectangle Body",position:{x:e,y:t},vertices:i.fromPath("L 0 0 L "+n+" 0 L "+n+" "+o+" L 0 "+o)};if(s.chamfer){var c=s.chamfer;l.vertices=i.chamfer(l.vertices,c.radius,c.quality,c.qualityMin,c.qualityMax),delete s.chamfer}return a.create(r.extend({},l,s))},o.trapezoid=function(e,t,n,o,s,l){l=l||{},s>=1&&r.warn("Bodies.trapezoid: slope parameter must be < 1.");var c,u=n*(s*=.5),d=u+(1-2*s)*n,p=d+u;c=s<.5?"L 0 0 L "+u+" "+-o+" L "+d+" "+-o+" L "+p+" 0":"L 0 0 L "+d+" "+-o+" L "+p+" 0";var f={label:"Trapezoid Body",position:{x:e,y:t},vertices:i.fromPath(c)};if(l.chamfer){var v=l.chamfer;f.vertices=i.chamfer(f.vertices,v.radius,v.quality,v.qualityMin,v.qualityMax),delete l.chamfer}return a.create(r.extend({},f,l))},o.circle=function(e,t,n,i,a){i=i||{};var s={label:"Circle Body",circleRadius:n};a=a||25;var l=Math.ceil(Math.max(10,Math.min(a,n)));return l%2==1&&(l+=1),o.polygon(e,t,l,n,r.extend({},s,i))},o.polygon=function(e,t,n,s,l){if(l=l||{},n<3)return o.circle(e,t,s,l);for(var c=2*Math.PI/n,u="",d=.5*c,p=0;p<n;p+=1){var f=d+p*c,v=Math.cos(f)*s,m=Math.sin(f)*s;u+="L "+v.toFixed(3)+" "+m.toFixed(3)+" "}var y={label:"Polygon Body",position:{x:e,y:t},vertices:i.fromPath(u)};if(l.chamfer){var g=l.chamfer;y.vertices=i.chamfer(y.vertices,g.radius,g.quality,g.qualityMin,g.qualityMax),delete l.chamfer}return a.create(r.extend({},y,l))},o.fromVertices=function(e,t,n,o,c,u,d,p){var f,v,m,y,g,x,h,b,S,w,A=r.getDecomp();for(f=Boolean(A&&A.quickDecomp),o=o||{},m=[],c=void 0!==c&&c,u=void 0!==u?u:.01,d=void 0!==d?d:10,p=void 0!==p?p:.01,r.isArray(n[0])||(n=[n]),S=0;S<n.length;S+=1)if(g=n[S],!(y=i.isConvex(g))&&!f&&r.warnOnce("Bodies.fromVertices: Install the 'poly-decomp' library and use Common.setDecomp or provide 'decomp' as a global to decompose concave vertices."),y||!f)g=y?i.clockwiseSort(g):i.hull(g),m.push({position:{x:e,y:t},vertices:g});else{var P=g.map((function(e){return[e.x,e.y]}));A.makeCCW(P),!1!==u&&A.removeCollinearPoints(P,u),!1!==p&&A.removeDuplicatePoints&&A.removeDuplicatePoints(P,p);var B=A.quickDecomp(P);for(x=0;x<B.length;x++){var M=B[x].map((function(e){return{x:e[0],y:e[1]}}));d>0&&i.area(M)<d||m.push({position:i.centre(M),vertices:M})}}for(x=0;x<m.length;x++)m[x]=a.create(r.extend(m[x],o));if(c)for(x=0;x<m.length;x++){var _=m[x];for(h=x+1;h<m.length;h++){var C=m[h];if(s.overlaps(_.bounds,C.bounds)){var k=_.vertices,I=C.vertices;for(b=0;b<_.vertices.length;b++)for(w=0;w<C.vertices.length;w++){var T=l.magnitudeSquared(l.sub(k[(b+1)%k.length],I[w])),R=l.magnitudeSquared(l.sub(k[b],I[(w+1)%I.length]));T<5&&R<5&&(k[b].isInternal=!0,I[w].isInternal=!0)}}}}return m.length>1?(v=a.create(r.extend({parts:m.slice(0)},o)),a.setPosition(v,{x:e,y:t}),v):m[0]}},function(e,t,n){var o={};e.exports=o;var i=n(0),r=n(8);o.create=function(e){return i.extend({bodies:[],collisions:[],pairs:null},e)},o.setBodies=function(e,t){e.bodies=t.slice(0)},o.clear=function(e){e.bodies=[],e.collisions=[]},o.collisions=function(e){var t,n,i=e.pairs,a=e.bodies,s=a.length,l=o.canCollide,c=r.collides,u=e.collisions,d=0;for(a.sort(o._compareBoundsX),t=0;t<s;t++){var p=a[t],f=p.bounds,v=p.bounds.max.x,m=p.bounds.max.y,y=p.bounds.min.y,g=p.isStatic||p.isSleeping,x=p.parts.length,h=1===x;for(n=t+1;n<s;n++){var b=a[n];if((C=b.bounds).min.x>v)break;if(!(m<C.min.y||y>C.max.y)&&(!g||!b.isStatic&&!b.isSleeping)&&l(p.collisionFilter,b.collisionFilter)){var S=b.parts.length;if(h&&1===S)(M=c(p,b,i))&&(u[d++]=M);else for(var w=S>1?1:0,A=x>1?1:0;A<x;A++)for(var P=p.parts[A],B=(f=P.bounds,w);B<S;B++){var M,_=b.parts[B],C=_.bounds;f.min.x>C.max.x||f.max.x<C.min.x||f.max.y<C.min.y||f.min.y>C.max.y||(M=c(P,_,i))&&(u[d++]=M)}}}}return u.length!==d&&(u.length=d),u},o.canCollide=function(e,t){return e.group===t.group&&0!==e.group?e.group>0:0!=(e.mask&t.category)&&0!=(t.mask&e.category)},o._compareBoundsX=function(e,t){return e.bounds.min.x-t.bounds.min.x}},function(e,t,n){var o={};e.exports=o;var i=n(0);o.create=function(e){var t={};return e||i.log("Mouse.create: element was undefined, defaulting to document.body","warn"),t.element=e||document.body,t.absolute={x:0,y:0},t.position={x:0,y:0},t.mousedownPosition={x:0,y:0},t.mouseupPosition={x:0,y:0},t.offset={x:0,y:0},t.scale={x:1,y:1},t.wheelDelta=0,t.button=-1,t.pixelRatio=parseInt(t.element.getAttribute("data-pixel-ratio"),10)||1,t.sourceEvents={mousemove:null,mousedown:null,mouseup:null,mousewheel:null},t.mousemove=function(e){var n=o._getRelativeMousePosition(e,t.element,t.pixelRatio);e.changedTouches&&(t.button=0,e.preventDefault()),t.absolute.x=n.x,t.absolute.y=n.y,t.position.x=t.absolute.x*t.scale.x+t.offset.x,t.position.y=t.absolute.y*t.scale.y+t.offset.y,t.sourceEvents.mousemove=e},t.mousedown=function(e){var n=o._getRelativeMousePosition(e,t.element,t.pixelRatio);e.changedTouches?(t.button=0,e.preventDefault()):t.button=e.button,t.absolute.x=n.x,t.absolute.y=n.y,t.position.x=t.absolute.x*t.scale.x+t.offset.x,t.position.y=t.absolute.y*t.scale.y+t.offset.y,t.mousedownPosition.x=t.position.x,t.mousedownPosition.y=t.position.y,t.sourceEvents.mousedown=e},t.mouseup=function(e){var n=o._getRelativeMousePosition(e,t.element,t.pixelRatio);e.changedTouches&&e.preventDefault(),t.button=-1,t.absolute.x=n.x,t.absolute.y=n.y,t.position.x=t.absolute.x*t.scale.x+t.offset.x,t.position.y=t.absolute.y*t.scale.y+t.offset.y,t.mouseupPosition.x=t.position.x,t.mouseupPosition.y=t.position.y,t.sourceEvents.mouseup=e},t.mousewheel=function(e){t.wheelDelta=Math.max(-1,Math.min(1,e.wheelDelta||-e.detail)),e.preventDefault(),t.sourceEvents.mousewheel=e},o.setElement(t,t.element),t},o.setElement=function(e,t){e.element=t,t.addEventListener("mousemove",e.mousemove,{passive:!0}),t.addEventListener("mousedown",e.mousedown,{passive:!0}),t.addEventListener("mouseup",e.mouseup,{passive:!0}),t.addEventListener("wheel",e.mousewheel,{passive:!1}),t.addEventListener("touchmove",e.mousemove,{passive:!1}),t.addEventListener("touchstart",e.mousedown,{passive:!1}),t.addEventListener("touchend",e.mouseup,{passive:!1})},o.clearSourceEvents=function(e){e.sourceEvents.mousemove=null,e.sourceEvents.mousedown=null,e.sourceEvents.mouseup=null,e.sourceEvents.mousewheel=null,e.wheelDelta=0},o.setOffset=function(e,t){e.offset.x=t.x,e.offset.y=t.y,e.position.x=e.absolute.x*e.scale.x+e.offset.x,e.position.y=e.absolute.y*e.scale.y+e.offset.y},o.setScale=function(e,t){e.scale.x=t.x,e.scale.y=t.y,e.position.x=e.absolute.x*e.scale.x+e.offset.x,e.position.y=e.absolute.y*e.scale.y+e.offset.y},o._getRelativeMousePosition=function(e,t,n){var o,i,r=t.getBoundingClientRect(),a=document.documentElement||document.body.parentNode||document.body,s=void 0!==window.pageXOffset?window.pageXOffset:a.scrollLeft,l=void 0!==window.pageYOffset?window.pageYOffset:a.scrollTop,c=e.changedTouches;return c?(o=c[0].pageX-r.left-s,i=c[0].pageY-r.top-l):(o=e.pageX-r.left-s,i=e.pageY-r.top-l),{x:o/(t.clientWidth/(t.width||t.clientWidth)*n),y:i/(t.clientHeight/(t.height||t.clientHeight)*n)}}},function(e,t,n){var o={};e.exports=o;var i=n(0);o._registry={},o.register=function(e){if(o.isPlugin(e)||i.warn("Plugin.register:",o.toString(e),"does not implement all required fields."),e.name in o._registry){var t=o._registry[e.name],n=o.versionParse(e.version).number,r=o.versionParse(t.version).number;n>r?(i.warn("Plugin.register:",o.toString(t),"was upgraded to",o.toString(e)),o._registry[e.name]=e):n<r?i.warn("Plugin.register:",o.toString(t),"can not be downgraded to",o.toString(e)):e!==t&&i.warn("Plugin.register:",o.toString(e),"is already registered to different plugin object")}else o._registry[e.name]=e;return e},o.resolve=function(e){return o._registry[o.dependencyParse(e).name]},o.toString=function(e){return"string"==typeof e?e:(e.name||"anonymous")+"@"+(e.version||e.range||"0.0.0")},o.isPlugin=function(e){return e&&e.name&&e.version&&e.install},o.isUsed=function(e,t){return e.used.indexOf(t)>-1},o.isFor=function(e,t){var n=e.for&&o.dependencyParse(e.for);return!e.for||t.name===n.name&&o.versionSatisfies(t.version,n.range)},o.use=function(e,t){if(e.uses=(e.uses||[]).concat(t||[]),0!==e.uses.length){for(var n=o.dependencies(e),r=i.topologicalSort(n),a=[],s=0;s<r.length;s+=1)if(r[s]!==e.name){var l=o.resolve(r[s]);l?o.isUsed(e,l.name)||(o.isFor(l,e)||(i.warn("Plugin.use:",o.toString(l),"is for",l.for,"but installed on",o.toString(e)+"."),l._warned=!0),l.install?l.install(e):(i.warn("Plugin.use:",o.toString(l),"does not specify an install function."),l._warned=!0),l._warned?(a.push("🔶 "+o.toString(l)),delete l._warned):a.push("✅ "+o.toString(l)),e.used.push(l.name)):a.push("❌ "+r[s])}a.length>0&&i.info(a.join("  "))}else i.warn("Plugin.use:",o.toString(e),"does not specify any dependencies to install.")},o.dependencies=function(e,t){var n=o.dependencyParse(e),r=n.name;if(!(r in(t=t||{}))){e=o.resolve(e)||e,t[r]=i.map(e.uses||[],(function(t){o.isPlugin(t)&&o.register(t);var r=o.dependencyParse(t),a=o.resolve(t);return a&&!o.versionSatisfies(a.version,r.range)?(i.warn("Plugin.dependencies:",o.toString(a),"does not satisfy",o.toString(r),"used by",o.toString(n)+"."),a._warned=!0,e._warned=!0):a||(i.warn("Plugin.dependencies:",o.toString(t),"used by",o.toString(n),"could not be resolved."),e._warned=!0),r.name}));for(var a=0;a<t[r].length;a+=1)o.dependencies(t[r][a],t);return t}},o.dependencyParse=function(e){return i.isString(e)?(/^[\w-]+(@(\*|[\^~]?\d+\.\d+\.\d+(-[0-9A-Za-z-+]+)?))?$/.test(e)||i.warn("Plugin.dependencyParse:",e,"is not a valid dependency string."),{name:e.split("@")[0],range:e.split("@")[1]||"*"}):{name:e.name,range:e.range||e.version}},o.versionParse=function(e){var t=/^(\*)|(\^|~|>=|>)?\s*((\d+)\.(\d+)\.(\d+))(-[0-9A-Za-z-+]+)?$/;t.test(e)||i.warn("Plugin.versionParse:",e,"is not a valid version or range.");var n=t.exec(e),o=Number(n[4]),r=Number(n[5]),a=Number(n[6]);return{isRange:Boolean(n[1]||n[2]),version:n[3],range:e,operator:n[1]||n[2]||"",major:o,minor:r,patch:a,parts:[o,r,a],prerelease:n[7],number:1e8*o+1e4*r+a}},o.versionSatisfies=function(e,t){t=t||"*";var n=o.versionParse(t),i=o.versionParse(e);if(n.isRange){if("*"===n.operator||"*"===e)return!0;if(">"===n.operator)return i.number>n.number;if(">="===n.operator)return i.number>=n.number;if("~"===n.operator)return i.major===n.major&&i.minor===n.minor&&i.patch>=n.patch;if("^"===n.operator)return n.major>0?i.major===n.major&&i.number>=n.number:n.minor>0?i.minor===n.minor&&i.patch>=n.patch:i.patch===n.patch}return e===t||"*"===e}},function(e,t){var n={};e.exports=n,n.create=function(e){return{vertex:e,normalImpulse:0,tangentImpulse:0}}},function(e,t,n){var o={};e.exports=o;var i=n(7),r=n(18),a=n(13),s=n(19),l=n(5),c=n(6),u=n(10),d=n(0),p=n(4);o._deltaMax=1e3/60,o.create=function(e){e=e||{};var t=d.extend({positionIterations:6,velocityIterations:4,constraintIterations:2,enableSleeping:!1,events:[],plugin:{},gravity:{x:0,y:1,scale:.001},timing:{timestamp:0,timeScale:1,lastDelta:0,lastElapsed:0,lastUpdatesPerFrame:0}},e);return t.world=e.world||c.create({label:"World"}),t.pairs=e.pairs||s.create(),t.detector=e.detector||a.create(),t.detector.pairs=t.pairs,t.grid={buckets:[]},t.world.gravity=t.gravity,t.broadphase=t.grid,t.metrics={},t},o.update=function(e,t){var n,p=d.now(),f=e.world,v=e.detector,m=e.pairs,y=e.timing,g=y.timestamp;t>o._deltaMax&&d.warnOnce("Matter.Engine.update: delta argument is recommended to be less than or equal to",o._deltaMax.toFixed(3),"ms."),t=void 0!==t?t:d._baseDelta,t*=y.timeScale,y.timestamp+=t,y.lastDelta=t;var x={timestamp:y.timestamp,delta:t};l.trigger(e,"beforeUpdate",x);var h=c.allBodies(f),b=c.allConstraints(f);for(f.isModified&&(a.setBodies(v,h),c.setModified(f,!1,!1,!0)),e.enableSleeping&&i.update(h,t),o._bodiesApplyGravity(h,e.gravity),t>0&&o._bodiesUpdate(h,t),l.trigger(e,"beforeSolve",x),u.preSolveAll(h),n=0;n<e.constraintIterations;n++)u.solveAll(b,t);u.postSolveAll(h);var S=a.collisions(v);s.update(m,S,g),e.enableSleeping&&i.afterCollisions(m.list),m.collisionStart.length>0&&l.trigger(e,"collisionStart",{pairs:m.collisionStart,timestamp:y.timestamp,delta:t});var w=d.clamp(20/e.positionIterations,0,1);for(r.preSolvePosition(m.list),n=0;n<e.positionIterations;n++)r.solvePosition(m.list,t,w);for(r.postSolvePosition(h),u.preSolveAll(h),n=0;n<e.constraintIterations;n++)u.solveAll(b,t);for(u.postSolveAll(h),r.preSolveVelocity(m.list),n=0;n<e.velocityIterations;n++)r.solveVelocity(m.list,t);return o._bodiesUpdateVelocities(h),m.collisionActive.length>0&&l.trigger(e,"collisionActive",{pairs:m.collisionActive,timestamp:y.timestamp,delta:t}),m.collisionEnd.length>0&&l.trigger(e,"collisionEnd",{pairs:m.collisionEnd,timestamp:y.timestamp,delta:t}),o._bodiesClearForces(h),l.trigger(e,"afterUpdate",x),e.timing.lastElapsed=d.now()-p,e},o.merge=function(e,t){if(d.extend(e,t),t.world){e.world=t.world,o.clear(e);for(var n=c.allBodies(e.world),r=0;r<n.length;r++){var a=n[r];i.set(a,!1),a.id=d.nextId()}}},o.clear=function(e){s.clear(e.pairs),a.clear(e.detector)},o._bodiesClearForces=function(e){for(var t=e.length,n=0;n<t;n++){var o=e[n];o.force.x=0,o.force.y=0,o.torque=0}},o._bodiesApplyGravity=function(e,t){var n=void 0!==t.scale?t.scale:.001,o=e.length;if((0!==t.x||0!==t.y)&&0!==n)for(var i=0;i<o;i++){var r=e[i];r.isStatic||r.isSleeping||(r.force.y+=r.mass*t.y*n,r.force.x+=r.mass*t.x*n)}},o._bodiesUpdate=function(e,t){for(var n=e.length,o=0;o<n;o++){var i=e[o];i.isStatic||i.isSleeping||p.update(i,t)}},o._bodiesUpdateVelocities=function(e){for(var t=e.length,n=0;n<t;n++)p.updateVelocities(e[n])}},function(e,t,n){var o={};e.exports=o;var i=n(3),r=n(0),a=n(1);o._restingThresh=2,o._restingThreshTangent=Math.sqrt(6),o._positionDampen=.9,o._positionWarming=.8,o._frictionNormalMultiplier=5,o._frictionMaxStatic=Number.MAX_VALUE,o.preSolvePosition=function(e){var t,n,o,i=e.length;for(t=0;t<i;t++)(n=e[t]).isActive&&(o=n.contactCount,n.collision.parentA.totalContacts+=o,n.collision.parentB.totalContacts+=o)},o.solvePosition=function(e,t,n){var i,a,s,l,c,u,d,p,f=o._positionDampen*(n||1),v=r.clamp(t/r._baseDelta,0,1),m=e.length;for(i=0;i<m;i++)(a=e[i]).isActive&&!a.isSensor&&(l=(s=a.collision).parentA,c=s.parentB,u=s.normal,a.separation=s.depth+u.x*(c.positionImpulse.x-l.positionImpulse.x)+u.y*(c.positionImpulse.y-l.positionImpulse.y));for(i=0;i<m;i++)(a=e[i]).isActive&&!a.isSensor&&(l=(s=a.collision).parentA,c=s.parentB,u=s.normal,p=a.separation-a.slop*v,(l.isStatic||c.isStatic)&&(p*=2),l.isStatic||l.isSleeping||(d=f/l.totalContacts,l.positionImpulse.x+=u.x*p*d,l.positionImpulse.y+=u.y*p*d),c.isStatic||c.isSleeping||(d=f/c.totalContacts,c.positionImpulse.x-=u.x*p*d,c.positionImpulse.y-=u.y*p*d))},o.postSolvePosition=function(e){for(var t=o._positionWarming,n=e.length,r=i.translate,s=a.update,l=0;l<n;l++){var c=e[l],u=c.positionImpulse,d=u.x,p=u.y,f=c.velocity;if(c.totalContacts=0,0!==d||0!==p){for(var v=0;v<c.parts.length;v++){var m=c.parts[v];r(m.vertices,u),s(m.bounds,m.vertices,f),m.position.x+=d,m.position.y+=p}c.positionPrev.x+=d,c.positionPrev.y+=p,d*f.x+p*f.y<0?(u.x=0,u.y=0):(u.x*=t,u.y*=t)}}},o.preSolveVelocity=function(e){var t,n,o=e.length;for(t=0;t<o;t++){var i=e[t];if(i.isActive&&!i.isSensor){var r=i.contacts,a=i.contactCount,s=i.collision,l=s.parentA,c=s.parentB,u=s.normal,d=s.tangent;for(n=0;n<a;n++){var p=r[n],f=p.vertex,v=p.normalImpulse,m=p.tangentImpulse;if(0!==v||0!==m){var y=u.x*v+d.x*m,g=u.y*v+d.y*m;l.isStatic||l.isSleeping||(l.positionPrev.x+=y*l.inverseMass,l.positionPrev.y+=g*l.inverseMass,l.anglePrev+=l.inverseInertia*((f.x-l.position.x)*g-(f.y-l.position.y)*y)),c.isStatic||c.isSleeping||(c.positionPrev.x-=y*c.inverseMass,c.positionPrev.y-=g*c.inverseMass,c.anglePrev-=c.inverseInertia*((f.x-c.position.x)*g-(f.y-c.position.y)*y))}}}}},o.solveVelocity=function(e,t){var n,i,a,s,l=t/r._baseDelta,c=l*l*l,u=-o._restingThresh*l,d=o._restingThreshTangent,p=o._frictionNormalMultiplier*l,f=o._frictionMaxStatic,v=e.length;for(a=0;a<v;a++){var m=e[a];if(m.isActive&&!m.isSensor){var y=m.collision,g=y.parentA,x=y.parentB,h=y.normal.x,b=y.normal.y,S=y.tangent.x,w=y.tangent.y,A=m.inverseMass,P=m.friction*m.frictionStatic*p,B=m.contacts,M=m.contactCount,_=1/M,C=g.position.x-g.positionPrev.x,k=g.position.y-g.positionPrev.y,I=g.angle-g.anglePrev,T=x.position.x-x.positionPrev.x,R=x.position.y-x.positionPrev.y,D=x.angle-x.anglePrev;for(s=0;s<M;s++){var V=B[s],E=V.vertex,L=E.x-g.position.x,F=E.y-g.position.y,O=E.x-x.position.x,H=E.y-x.position.y,q=C-F*I-(T-H*D),j=k+L*I-(R+O*D),U=h*q+b*j,W=S*q+w*j,N=m.separation+U,G=Math.min(N,1),z=(G=N<0?0:G)*P;W<-z||W>z?(i=W>0?W:-W,(n=m.friction*(W>0?1:-1)*c)<-i?n=-i:n>i&&(n=i)):(n=W,i=f);var X=L*b-F*h,Q=O*b-H*h,Y=_/(A+g.inverseInertia*X*X+x.inverseInertia*Q*Q),Z=(1+m.restitution)*U*Y;if(n*=Y,U<u)V.normalImpulse=0;else{var $=V.normalImpulse;V.normalImpulse+=Z,V.normalImpulse>0&&(V.normalImpulse=0),Z=V.normalImpulse-$}if(W<-d||W>d)V.tangentImpulse=0;else{var J=V.tangentImpulse;V.tangentImpulse+=n,V.tangentImpulse<-i&&(V.tangentImpulse=-i),V.tangentImpulse>i&&(V.tangentImpulse=i),n=V.tangentImpulse-J}var K=h*Z+S*n,ee=b*Z+w*n;g.isStatic||g.isSleeping||(g.positionPrev.x+=K*g.inverseMass,g.positionPrev.y+=ee*g.inverseMass,g.anglePrev+=(L*ee-F*K)*g.inverseInertia),x.isStatic||x.isSleeping||(x.positionPrev.x-=K*x.inverseMass,x.positionPrev.y-=ee*x.inverseMass,x.anglePrev-=(O*ee-H*K)*x.inverseInertia)}}}}},function(e,t,n){var o={};e.exports=o;var i=n(9),r=n(0);o.create=function(e){return r.extend({table:{},list:[],collisionStart:[],collisionActive:[],collisionEnd:[]},e)},o.update=function(e,t,n){var o,r,a,s=i.update,l=i.create,c=i.setActive,u=e.table,d=e.list,p=d.length,f=p,v=e.collisionStart,m=e.collisionEnd,y=e.collisionActive,g=t.length,x=0,h=0,b=0;for(a=0;a<g;a++)(r=(o=t[a]).pair)?(r.isActive&&(y[b++]=r),s(r,o,n)):(u[(r=l(o,n)).id]=r,v[x++]=r,d[f++]=r);for(f=0,p=d.length,a=0;a<p;a++)(r=d[a]).timeUpdated>=n?d[f++]=r:(c(r,!1,n),r.collision.bodyA.sleepCounter>0&&r.collision.bodyB.sleepCounter>0?d[f++]=r:(m[h++]=r,delete u[r.id]));d.length!==f&&(d.length=f),v.length!==x&&(v.length=x),m.length!==h&&(m.length=h),y.length!==b&&(y.length=b)},o.clear=function(e){return e.table={},e.list.length=0,e.collisionStart.length=0,e.collisionActive.length=0,e.collisionEnd.length=0,e}},function(e,t,n){var o=e.exports=n(21);o.Axes=n(11),o.Bodies=n(12),o.Body=n(4),o.Bounds=n(1),o.Collision=n(8),o.Common=n(0),o.Composite=n(6),o.Composites=n(22),o.Constraint=n(10),o.Contact=n(16),o.Detector=n(13),o.Engine=n(17),o.Events=n(5),o.Grid=n(23),o.Mouse=n(14),o.MouseConstraint=n(24),o.Pair=n(9),o.Pairs=n(19),o.Plugin=n(15),o.Query=n(25),o.Render=n(26),o.Resolver=n(18),o.Runner=n(27),o.SAT=n(28),o.Sleeping=n(7),o.Svg=n(29),o.Vector=n(2),o.Vertices=n(3),o.World=n(30),o.Engine.run=o.Runner.run,o.Common.deprecated(o.Engine,"run","Engine.run ➤ use Matter.Runner.run(engine) instead")},function(e,t,n){var o={};e.exports=o;var i=n(15),r=n(0);o.name="matter-js",o.version="0.20.0",o.uses=[],o.used=[],o.use=function(){i.use(o,Array.prototype.slice.call(arguments))},o.before=function(e,t){return e=e.replace(/^Matter./,""),r.chainPathBefore(o,e,t)},o.after=function(e,t){return e=e.replace(/^Matter./,""),r.chainPathAfter(o,e,t)}},function(e,t,n){var o={};e.exports=o;var i=n(6),r=n(10),a=n(0),s=n(4),l=n(12),c=a.deprecated;o.stack=function(e,t,n,o,r,a,l){for(var c,u=i.create({label:"Stack"}),d=e,p=t,f=0,v=0;v<o;v++){for(var m=0,y=0;y<n;y++){var g=l(d,p,y,v,c,f);if(g){var x=g.bounds.max.y-g.bounds.min.y,h=g.bounds.max.x-g.bounds.min.x;x>m&&(m=x),s.translate(g,{x:.5*h,y:.5*x}),d=g.bounds.max.x+r,i.addBody(u,g),c=g,f+=1}else d+=r}p+=m+a,d=e}return u},o.chain=function(e,t,n,o,s,l){for(var c=e.bodies,u=1;u<c.length;u++){var d=c[u-1],p=c[u],f=d.bounds.max.y-d.bounds.min.y,v=d.bounds.max.x-d.bounds.min.x,m=p.bounds.max.y-p.bounds.min.y,y={bodyA:d,pointA:{x:v*t,y:f*n},bodyB:p,pointB:{x:(p.bounds.max.x-p.bounds.min.x)*o,y:m*s}},g=a.extend(y,l);i.addConstraint(e,r.create(g))}return e.label+=" Chain",e},o.mesh=function(e,t,n,o,s){var l,c,u,d,p,f=e.bodies;for(l=0;l<n;l++){for(c=1;c<t;c++)u=f[c-1+l*t],d=f[c+l*t],i.addConstraint(e,r.create(a.extend({bodyA:u,bodyB:d},s)));if(l>0)for(c=0;c<t;c++)u=f[c+(l-1)*t],d=f[c+l*t],i.addConstraint(e,r.create(a.extend({bodyA:u,bodyB:d},s))),o&&c>0&&(p=f[c-1+(l-1)*t],i.addConstraint(e,r.create(a.extend({bodyA:p,bodyB:d},s)))),o&&c<t-1&&(p=f[c+1+(l-1)*t],i.addConstraint(e,r.create(a.extend({bodyA:p,bodyB:d},s))))}return e.label+=" Mesh",e},o.pyramid=function(e,t,n,i,r,a,l){return o.stack(e,t,n,i,r,a,(function(t,o,a,c,u,d){var p=Math.min(i,Math.ceil(n/2)),f=u?u.bounds.max.x-u.bounds.min.x:0;if(!(c>p||a<(c=p-c)||a>n-1-c))return 1===d&&s.translate(u,{x:(a+(n%2==1?1:-1))*f,y:0}),l(e+(u?a*f:0)+a*r,o,a,c,u,d)}))},o.newtonsCradle=function(e,t,n,o,a){for(var s=i.create({label:"Newtons Cradle"}),c=0;c<n;c++){var u=l.circle(e+c*(1.9*o),t+a,o,{inertia:1/0,restitution:1,friction:0,frictionAir:1e-4,slop:1}),d=r.create({pointA:{x:e+c*(1.9*o),y:t},bodyB:u});i.addBody(s,u),i.addConstraint(s,d)}return s},c(o,"newtonsCradle","Composites.newtonsCradle ➤ moved to newtonsCradle example"),o.car=function(e,t,n,o,a){var c=s.nextGroup(!0),u=.5*-n+20,d=.5*n-20,p=i.create({label:"Car"}),f=l.rectangle(e,t,n,o,{collisionFilter:{group:c},chamfer:{radius:.5*o},density:2e-4}),v=l.circle(e+u,t+0,a,{collisionFilter:{group:c},friction:.8}),m=l.circle(e+d,t+0,a,{collisionFilter:{group:c},friction:.8}),y=r.create({bodyB:f,pointB:{x:u,y:0},bodyA:v,stiffness:1,length:0}),g=r.create({bodyB:f,pointB:{x:d,y:0},bodyA:m,stiffness:1,length:0});return i.addBody(p,f),i.addBody(p,v),i.addBody(p,m),i.addConstraint(p,y),i.addConstraint(p,g),p},c(o,"car","Composites.car ➤ moved to car example"),o.softBody=function(e,t,n,i,r,s,c,u,d,p){d=a.extend({inertia:1/0},d),p=a.extend({stiffness:.2,render:{type:"line",anchors:!1}},p);var f=o.stack(e,t,n,i,r,s,(function(e,t){return l.circle(e,t,u,d)}));return o.mesh(f,n,i,c,p),f.label="Soft Body",f},c(o,"softBody","Composites.softBody ➤ moved to softBody and cloth examples")},function(e,t,n){var o={};e.exports=o;var i=n(9),r=n(0),a=r.deprecated;o.create=function(e){return r.extend({buckets:{},pairs:{},pairsList:[],bucketWidth:48,bucketHeight:48},e)},o.update=function(e,t,n,i){var r,a,s,l,c,u=n.world,d=e.buckets,p=!1;for(r=0;r<t.length;r++){var f=t[r];if((!f.isSleeping||i)&&(!u.bounds||!(f.bounds.max.x<u.bounds.min.x||f.bounds.min.x>u.bounds.max.x||f.bounds.max.y<u.bounds.min.y||f.bounds.min.y>u.bounds.max.y))){var v=o._getRegion(e,f);if(!f.region||v.id!==f.region.id||i){f.region&&!i||(f.region=v);var m=o._regionUnion(v,f.region);for(a=m.startCol;a<=m.endCol;a++)for(s=m.startRow;s<=m.endRow;s++){l=d[c=o._getBucketId(a,s)];var y=a>=v.startCol&&a<=v.endCol&&s>=v.startRow&&s<=v.endRow,g=a>=f.region.startCol&&a<=f.region.endCol&&s>=f.region.startRow&&s<=f.region.endRow;!y&&g&&g&&l&&o._bucketRemoveBody(e,l,f),(f.region===v||y&&!g||i)&&(l||(l=o._createBucket(d,c)),o._bucketAddBody(e,l,f))}f.region=v,p=!0}}}p&&(e.pairsList=o._createActivePairsList(e))},a(o,"update","Grid.update ➤ replaced by Matter.Detector"),o.clear=function(e){e.buckets={},e.pairs={},e.pairsList=[]},a(o,"clear","Grid.clear ➤ replaced by Matter.Detector"),o._regionUnion=function(e,t){var n=Math.min(e.startCol,t.startCol),i=Math.max(e.endCol,t.endCol),r=Math.min(e.startRow,t.startRow),a=Math.max(e.endRow,t.endRow);return o._createRegion(n,i,r,a)},o._getRegion=function(e,t){var n=t.bounds,i=Math.floor(n.min.x/e.bucketWidth),r=Math.floor(n.max.x/e.bucketWidth),a=Math.floor(n.min.y/e.bucketHeight),s=Math.floor(n.max.y/e.bucketHeight);return o._createRegion(i,r,a,s)},o._createRegion=function(e,t,n,o){return{id:e+","+t+","+n+","+o,startCol:e,endCol:t,startRow:n,endRow:o}},o._getBucketId=function(e,t){return"C"+e+"R"+t},o._createBucket=function(e,t){return e[t]=[]},o._bucketAddBody=function(e,t,n){var o,r=e.pairs,a=i.id,s=t.length;for(o=0;o<s;o++){var l=t[o];if(!(n.id===l.id||n.isStatic&&l.isStatic)){var c=a(n,l),u=r[c];u?u[2]+=1:r[c]=[n,l,1]}}t.push(n)},o._bucketRemoveBody=function(e,t,n){var o,a=e.pairs,s=i.id;t.splice(r.indexOf(t,n),1);var l=t.length;for(o=0;o<l;o++){var c=a[s(n,t[o])];c&&(c[2]-=1)}},o._createActivePairsList=function(e){var t,n,o=e.pairs,i=r.keys(o),a=i.length,s=[];for(n=0;n<a;n++)(t=o[i[n]])[2]>0?s.push(t):delete o[i[n]];return s}},function(e,t,n){var o={};e.exports=o;var i=n(3),r=n(7),a=n(14),s=n(5),l=n(13),c=n(10),u=n(6),d=n(0),p=n(1);o.create=function(e,t){var n=(e?e.mouse:null)||(t?t.mouse:null);n||(e&&e.render&&e.render.canvas?n=a.create(e.render.canvas):t&&t.element?n=a.create(t.element):(n=a.create(),d.warn("MouseConstraint.create: options.mouse was undefined, options.element was undefined, may not function as expected")));var i={type:"mouseConstraint",mouse:n,element:null,body:null,constraint:c.create({label:"Mouse Constraint",pointA:n.position,pointB:{x:0,y:0},length:.01,stiffness:.1,angularStiffness:1,render:{strokeStyle:"#90EE90",lineWidth:3}}),collisionFilter:{category:1,mask:4294967295,group:0}},r=d.extend(i,t);return s.on(e,"beforeUpdate",(function(){var t=u.allBodies(e.world);o.update(r,t),o._triggerEvents(r)})),r},o.update=function(e,t){var n=e.mouse,o=e.constraint,a=e.body;if(0===n.button){if(o.bodyB)r.set(o.bodyB,!1),o.pointA=n.position;else for(var c=0;c<t.length;c++)if(a=t[c],p.contains(a.bounds,n.position)&&l.canCollide(a.collisionFilter,e.collisionFilter))for(var u=a.parts.length>1?1:0;u<a.parts.length;u++){var d=a.parts[u];if(i.contains(d.vertices,n.position)){o.pointA=n.position,o.bodyB=e.body=a,o.pointB={x:n.position.x-a.position.x,y:n.position.y-a.position.y},o.angleB=a.angle,r.set(a,!1),s.trigger(e,"startdrag",{mouse:n,body:a});break}}}else o.bodyB=e.body=null,o.pointB=null,a&&s.trigger(e,"enddrag",{mouse:n,body:a})},o._triggerEvents=function(e){var t=e.mouse,n=t.sourceEvents;n.mousemove&&s.trigger(e,"mousemove",{mouse:t}),n.mousedown&&s.trigger(e,"mousedown",{mouse:t}),n.mouseup&&s.trigger(e,"mouseup",{mouse:t}),a.clearSourceEvents(t)}},function(e,t,n){var o={};e.exports=o;var i=n(2),r=n(8),a=n(1),s=n(12),l=n(3);o.collides=function(e,t){for(var n=[],o=t.length,i=e.bounds,s=r.collides,l=a.overlaps,c=0;c<o;c++){var u=t[c],d=u.parts.length,p=1===d?0:1;if(l(u.bounds,i))for(var f=p;f<d;f++){var v=u.parts[f];if(l(v.bounds,i)){var m=s(v,e);if(m){n.push(m);break}}}}return n},o.ray=function(e,t,n,r){r=r||1e-100;for(var a=i.angle(t,n),l=i.magnitude(i.sub(t,n)),c=.5*(n.x+t.x),u=.5*(n.y+t.y),d=s.rectangle(c,u,l,r,{angle:a}),p=o.collides(d,e),f=0;f<p.length;f+=1){var v=p[f];v.body=v.bodyB=v.bodyA}return p},o.region=function(e,t,n){for(var o=[],i=0;i<e.length;i++){var r=e[i],s=a.overlaps(r.bounds,t);(s&&!n||!s&&n)&&o.push(r)}return o},o.point=function(e,t){for(var n=[],o=0;o<e.length;o++){var i=e[o];if(a.contains(i.bounds,t))for(var r=1===i.parts.length?0:1;r<i.parts.length;r++){var s=i.parts[r];if(a.contains(s.bounds,t)&&l.contains(s.vertices,t)){n.push(i);break}}}return n}},function(e,t,n){var o={};e.exports=o;var i=n(4),r=n(0),a=n(6),s=n(1),l=n(5),c=n(2),u=n(14);!function(){var e,t;"undefined"!=typeof window&&(e=window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.msRequestAnimationFrame||function(e){window.setTimeout((function(){e(r.now())}),1e3/60)},t=window.cancelAnimationFrame||window.mozCancelAnimationFrame||window.webkitCancelAnimationFrame||window.msCancelAnimationFrame),o._goodFps=30,o._goodDelta=1e3/60,o.create=function(e){var t={engine:null,element:null,canvas:null,mouse:null,frameRequestId:null,timing:{historySize:60,delta:0,deltaHistory:[],lastTime:0,lastTimestamp:0,lastElapsed:0,timestampElapsed:0,timestampElapsedHistory:[],engineDeltaHistory:[],engineElapsedHistory:[],engineUpdatesHistory:[],elapsedHistory:[]},options:{width:800,height:600,pixelRatio:1,background:"#14151f",wireframeBackground:"#14151f",wireframeStrokeStyle:"#bbb",hasBounds:!!e.bounds,enabled:!0,wireframes:!0,showSleeping:!0,showDebug:!1,showStats:!1,showPerformance:!1,showBounds:!1,showVelocity:!1,showCollisions:!1,showSeparations:!1,showAxes:!1,showPositions:!1,showAngleIndicator:!1,showIds:!1,showVertexNumbers:!1,showConvexHulls:!1,showInternalEdges:!1,showMousePosition:!1}},n=r.extend(t,e);return n.canvas&&(n.canvas.width=n.options.width||n.canvas.width,n.canvas.height=n.options.height||n.canvas.height),n.mouse=e.mouse,n.engine=e.engine,n.canvas=n.canvas||p(n.options.width,n.options.height),n.context=n.canvas.getContext("2d"),n.textures={},n.bounds=n.bounds||{min:{x:0,y:0},max:{x:n.canvas.width,y:n.canvas.height}},n.controller=o,n.options.showBroadphase=!1,1!==n.options.pixelRatio&&o.setPixelRatio(n,n.options.pixelRatio),r.isElement(n.element)&&n.element.appendChild(n.canvas),n},o.run=function(t){!function i(r){t.frameRequestId=e(i),n(t,r),o.world(t,r),t.context.setTransform(t.options.pixelRatio,0,0,t.options.pixelRatio,0,0),(t.options.showStats||t.options.showDebug)&&o.stats(t,t.context,r),(t.options.showPerformance||t.options.showDebug)&&o.performance(t,t.context,r),t.context.setTransform(1,0,0,1,0,0)}()},o.stop=function(e){t(e.frameRequestId)},o.setPixelRatio=function(e,t){var n=e.options,o=e.canvas;"auto"===t&&(t=f(o)),n.pixelRatio=t,o.setAttribute("data-pixel-ratio",t),o.width=n.width*t,o.height=n.height*t,o.style.width=n.width+"px",o.style.height=n.height+"px"},o.setSize=function(e,t,n){e.options.width=t,e.options.height=n,e.bounds.max.x=e.bounds.min.x+t,e.bounds.max.y=e.bounds.min.y+n,1!==e.options.pixelRatio?o.setPixelRatio(e,e.options.pixelRatio):(e.canvas.width=t,e.canvas.height=n)},o.lookAt=function(e,t,n,o){o=void 0===o||o,t=r.isArray(t)?t:[t],n=n||{x:0,y:0};for(var i={min:{x:1/0,y:1/0},max:{x:-1/0,y:-1/0}},a=0;a<t.length;a+=1){var s=t[a],l=s.bounds?s.bounds.min:s.min||s.position||s,c=s.bounds?s.bounds.max:s.max||s.position||s;l&&c&&(l.x<i.min.x&&(i.min.x=l.x),c.x>i.max.x&&(i.max.x=c.x),l.y<i.min.y&&(i.min.y=l.y),c.y>i.max.y&&(i.max.y=c.y))}var d=i.max.x-i.min.x+2*n.x,p=i.max.y-i.min.y+2*n.y,f=e.canvas.height,v=e.canvas.width/f,m=d/p,y=1,g=1;m>v?g=m/v:y=v/m,e.options.hasBounds=!0,e.bounds.min.x=i.min.x,e.bounds.max.x=i.min.x+d*y,e.bounds.min.y=i.min.y,e.bounds.max.y=i.min.y+p*g,o&&(e.bounds.min.x+=.5*d-d*y*.5,e.bounds.max.x+=.5*d-d*y*.5,e.bounds.min.y+=.5*p-p*g*.5,e.bounds.max.y+=.5*p-p*g*.5),e.bounds.min.x-=n.x,e.bounds.max.x-=n.x,e.bounds.min.y-=n.y,e.bounds.max.y-=n.y,e.mouse&&(u.setScale(e.mouse,{x:(e.bounds.max.x-e.bounds.min.x)/e.canvas.width,y:(e.bounds.max.y-e.bounds.min.y)/e.canvas.height}),u.setOffset(e.mouse,e.bounds.min))},o.startViewTransform=function(e){var t=e.bounds.max.x-e.bounds.min.x,n=e.bounds.max.y-e.bounds.min.y,o=t/e.options.width,i=n/e.options.height;e.context.setTransform(e.options.pixelRatio/o,0,0,e.options.pixelRatio/i,0,0),e.context.translate(-e.bounds.min.x,-e.bounds.min.y)},o.endViewTransform=function(e){e.context.setTransform(e.options.pixelRatio,0,0,e.options.pixelRatio,0,0)},o.world=function(e,t){var n,i=r.now(),d=e.engine,p=d.world,f=e.canvas,v=e.context,y=e.options,g=e.timing,x=a.allBodies(p),h=a.allConstraints(p),b=y.wireframes?y.wireframeBackground:y.background,S=[],w=[],A={timestamp:d.timing.timestamp};if(l.trigger(e,"beforeRender",A),e.currentBackground!==b&&m(e,b),v.globalCompositeOperation="source-in",v.fillStyle="transparent",v.fillRect(0,0,f.width,f.height),v.globalCompositeOperation="source-over",y.hasBounds){for(n=0;n<x.length;n++){var P=x[n];s.overlaps(P.bounds,e.bounds)&&S.push(P)}for(n=0;n<h.length;n++){var B=h[n],M=B.bodyA,_=B.bodyB,C=B.pointA,k=B.pointB;M&&(C=c.add(M.position,B.pointA)),_&&(k=c.add(_.position,B.pointB)),C&&k&&((s.contains(e.bounds,C)||s.contains(e.bounds,k))&&w.push(B))}o.startViewTransform(e),e.mouse&&(u.setScale(e.mouse,{x:(e.bounds.max.x-e.bounds.min.x)/e.options.width,y:(e.bounds.max.y-e.bounds.min.y)/e.options.height}),u.setOffset(e.mouse,e.bounds.min))}else w=h,S=x,1!==e.options.pixelRatio&&e.context.setTransform(e.options.pixelRatio,0,0,e.options.pixelRatio,0,0);!y.wireframes||d.enableSleeping&&y.showSleeping?o.bodies(e,S,v):(y.showConvexHulls&&o.bodyConvexHulls(e,S,v),o.bodyWireframes(e,S,v)),y.showBounds&&o.bodyBounds(e,S,v),(y.showAxes||y.showAngleIndicator)&&o.bodyAxes(e,S,v),y.showPositions&&o.bodyPositions(e,S,v),y.showVelocity&&o.bodyVelocity(e,S,v),y.showIds&&o.bodyIds(e,S,v),y.showSeparations&&o.separations(e,d.pairs.list,v),y.showCollisions&&o.collisions(e,d.pairs.list,v),y.showVertexNumbers&&o.vertexNumbers(e,S,v),y.showMousePosition&&o.mousePosition(e,e.mouse,v),o.constraints(w,v),y.hasBounds&&o.endViewTransform(e),l.trigger(e,"afterRender",A),g.lastElapsed=r.now()-i},o.stats=function(e,t,n){for(var o=e.engine,i=o.world,r=a.allBodies(i),s=0,l=0,c=0;c<r.length;c+=1)s+=r[c].parts.length;var u={Part:s,Body:r.length,Cons:a.allConstraints(i).length,Comp:a.allComposites(i).length,Pair:o.pairs.list.length};for(var d in t.fillStyle="#0e0f19",t.fillRect(l,0,302.5,44),t.font="12px Arial",t.textBaseline="top",t.textAlign="right",u){var p=u[d];t.fillStyle="#aaa",t.fillText(d,l+55,8),t.fillStyle="#eee",t.fillText(p,l+55,26),l+=55}},o.performance=function(e,t){var n=e.engine,i=e.timing,a=i.deltaHistory,s=i.elapsedHistory,l=i.timestampElapsedHistory,c=i.engineDeltaHistory,u=i.engineUpdatesHistory,p=i.engineElapsedHistory,f=n.timing.lastUpdatesPerFrame,v=n.timing.lastDelta,m=d(a),y=d(s),g=d(c),x=d(u),h=d(p),b=d(l)/m||0,S=Math.round(m/v),w=1e3/m||0,A=10,P=69;t.fillStyle="#0e0f19",t.fillRect(0,50,442,34),o.status(t,A,P,60,4,a.length,Math.round(w)+" fps",w/o._goodFps,(function(e){return a[e]/m-1})),o.status(t,82,P,60,4,c.length,v.toFixed(2)+" dt",o._goodDelta/v,(function(e){return c[e]/g-1})),o.status(t,154,P,60,4,u.length,f+" upf",Math.pow(r.clamp(x/S||1,0,1),4),(function(e){return u[e]/x-1})),o.status(t,226,P,60,4,p.length,h.toFixed(2)+" ut",1-f*h/o._goodFps,(function(e){return p[e]/h-1})),o.status(t,298,P,60,4,s.length,y.toFixed(2)+" rt",1-y/o._goodFps,(function(e){return s[e]/y-1})),o.status(t,370,P,60,4,l.length,b.toFixed(2)+" x",b*b*b,(function(e){return(l[e]/a[e]/b||0)-1}))},o.status=function(e,t,n,o,i,a,s,l,c){e.strokeStyle="#888",e.fillStyle="#444",e.lineWidth=1,e.fillRect(t,n+7,o,1),e.beginPath(),e.moveTo(t,n+7-i*r.clamp(.4*c(0),-2,2));for(var u=0;u<o;u+=1)e.lineTo(t+u,n+7-(u<a?i*r.clamp(.4*c(u),-2,2):0));e.stroke(),e.fillStyle="hsl("+r.clamp(25+95*l,0,120)+",100%,60%)",e.fillRect(t,n-7,4,4),e.font="12px Arial",e.textBaseline="middle",e.textAlign="right",e.fillStyle="#eee",e.fillText(s,t+o,n-5)},o.constraints=function(e,t){for(var n=t,o=0;o<e.length;o++){var i=e[o];if(i.render.visible&&i.pointA&&i.pointB){var a,s,l=i.bodyA,u=i.bodyB;if(a=l?c.add(l.position,i.pointA):i.pointA,"pin"===i.render.type)n.beginPath(),n.arc(a.x,a.y,3,0,2*Math.PI),n.closePath();else{if(s=u?c.add(u.position,i.pointB):i.pointB,n.beginPath(),n.moveTo(a.x,a.y),"spring"===i.render.type)for(var d,p=c.sub(s,a),f=c.perp(c.normalise(p)),v=Math.ceil(r.clamp(i.length/5,12,20)),m=1;m<v;m+=1)d=m%2==0?1:-1,n.lineTo(a.x+p.x*(m/v)+f.x*d*4,a.y+p.y*(m/v)+f.y*d*4);n.lineTo(s.x,s.y)}i.render.lineWidth&&(n.lineWidth=i.render.lineWidth,n.strokeStyle=i.render.strokeStyle,n.stroke()),i.render.anchors&&(n.fillStyle=i.render.strokeStyle,n.beginPath(),n.arc(a.x,a.y,3,0,2*Math.PI),n.arc(s.x,s.y,3,0,2*Math.PI),n.closePath(),n.fill())}}},o.bodies=function(e,t,n){var o,i,r,a,s=n,l=(e.engine,e.options),c=l.showInternalEdges||!l.wireframes;for(r=0;r<t.length;r++)if((o=t[r]).render.visible)for(a=o.parts.length>1?1:0;a<o.parts.length;a++)if((i=o.parts[a]).render.visible){if(l.showSleeping&&o.isSleeping?s.globalAlpha=.5*i.render.opacity:1!==i.render.opacity&&(s.globalAlpha=i.render.opacity),i.render.sprite&&i.render.sprite.texture&&!l.wireframes){var u=i.render.sprite,d=v(e,u.texture);s.translate(i.position.x,i.position.y),s.rotate(i.angle),s.drawImage(d,d.width*-u.xOffset*u.xScale,d.height*-u.yOffset*u.yScale,d.width*u.xScale,d.height*u.yScale),s.rotate(-i.angle),s.translate(-i.position.x,-i.position.y)}else{if(i.circleRadius)s.beginPath(),s.arc(i.position.x,i.position.y,i.circleRadius,0,2*Math.PI);else{s.beginPath(),s.moveTo(i.vertices[0].x,i.vertices[0].y);for(var p=1;p<i.vertices.length;p++)!i.vertices[p-1].isInternal||c?s.lineTo(i.vertices[p].x,i.vertices[p].y):s.moveTo(i.vertices[p].x,i.vertices[p].y),i.vertices[p].isInternal&&!c&&s.moveTo(i.vertices[(p+1)%i.vertices.length].x,i.vertices[(p+1)%i.vertices.length].y);s.lineTo(i.vertices[0].x,i.vertices[0].y),s.closePath()}l.wireframes?(s.lineWidth=1,s.strokeStyle=e.options.wireframeStrokeStyle,s.stroke()):(s.fillStyle=i.render.fillStyle,i.render.lineWidth&&(s.lineWidth=i.render.lineWidth,s.strokeStyle=i.render.strokeStyle,s.stroke()),s.fill())}s.globalAlpha=1}},o.bodyWireframes=function(e,t,n){var o,i,r,a,s,l=n,c=e.options.showInternalEdges;for(l.beginPath(),r=0;r<t.length;r++)if((o=t[r]).render.visible)for(s=o.parts.length>1?1:0;s<o.parts.length;s++){for(i=o.parts[s],l.moveTo(i.vertices[0].x,i.vertices[0].y),a=1;a<i.vertices.length;a++)!i.vertices[a-1].isInternal||c?l.lineTo(i.vertices[a].x,i.vertices[a].y):l.moveTo(i.vertices[a].x,i.vertices[a].y),i.vertices[a].isInternal&&!c&&l.moveTo(i.vertices[(a+1)%i.vertices.length].x,i.vertices[(a+1)%i.vertices.length].y);l.lineTo(i.vertices[0].x,i.vertices[0].y)}l.lineWidth=1,l.strokeStyle=e.options.wireframeStrokeStyle,l.stroke()},o.bodyConvexHulls=function(e,t,n){var o,i,r,a=n;for(a.beginPath(),i=0;i<t.length;i++)if((o=t[i]).render.visible&&1!==o.parts.length){for(a.moveTo(o.vertices[0].x,o.vertices[0].y),r=1;r<o.vertices.length;r++)a.lineTo(o.vertices[r].x,o.vertices[r].y);a.lineTo(o.vertices[0].x,o.vertices[0].y)}a.lineWidth=1,a.strokeStyle="rgba(255,255,255,0.2)",a.stroke()},o.vertexNumbers=function(e,t,n){var o,i,r,a=n;for(o=0;o<t.length;o++){var s=t[o].parts;for(r=s.length>1?1:0;r<s.length;r++){var l=s[r];for(i=0;i<l.vertices.length;i++)a.fillStyle="rgba(255,255,255,0.2)",a.fillText(o+"_"+i,l.position.x+.8*(l.vertices[i].x-l.position.x),l.position.y+.8*(l.vertices[i].y-l.position.y))}}},o.mousePosition=function(e,t,n){var o=n;o.fillStyle="rgba(255,255,255,0.8)",o.fillText(t.position.x+"  "+t.position.y,t.position.x+5,t.position.y-5)},o.bodyBounds=function(e,t,n){var o=n,i=(e.engine,e.options);o.beginPath();for(var r=0;r<t.length;r++){if(t[r].render.visible)for(var a=t[r].parts,s=a.length>1?1:0;s<a.length;s++){var l=a[s];o.rect(l.bounds.min.x,l.bounds.min.y,l.bounds.max.x-l.bounds.min.x,l.bounds.max.y-l.bounds.min.y)}}i.wireframes?o.strokeStyle="rgba(255,255,255,0.08)":o.strokeStyle="rgba(0,0,0,0.1)",o.lineWidth=1,o.stroke()},o.bodyAxes=function(e,t,n){var o,i,r,a,s=n,l=(e.engine,e.options);for(s.beginPath(),i=0;i<t.length;i++){var c=t[i],u=c.parts;if(c.render.visible)if(l.showAxes)for(r=u.length>1?1:0;r<u.length;r++)for(o=u[r],a=0;a<o.axes.length;a++){var d=o.axes[a];s.moveTo(o.position.x,o.position.y),s.lineTo(o.position.x+20*d.x,o.position.y+20*d.y)}else for(r=u.length>1?1:0;r<u.length;r++)for(o=u[r],a=0;a<o.axes.length;a++)s.moveTo(o.position.x,o.position.y),s.lineTo((o.vertices[0].x+o.vertices[o.vertices.length-1].x)/2,(o.vertices[0].y+o.vertices[o.vertices.length-1].y)/2)}l.wireframes?(s.strokeStyle="indianred",s.lineWidth=1):(s.strokeStyle="rgba(255, 255, 255, 0.4)",s.globalCompositeOperation="overlay",s.lineWidth=2),s.stroke(),s.globalCompositeOperation="source-over"},o.bodyPositions=function(e,t,n){var o,i,r,a,s=n,l=(e.engine,e.options);for(s.beginPath(),r=0;r<t.length;r++)if((o=t[r]).render.visible)for(a=0;a<o.parts.length;a++)i=o.parts[a],s.arc(i.position.x,i.position.y,3,0,2*Math.PI,!1),s.closePath();for(l.wireframes?s.fillStyle="indianred":s.fillStyle="rgba(0,0,0,0.5)",s.fill(),s.beginPath(),r=0;r<t.length;r++)(o=t[r]).render.visible&&(s.arc(o.positionPrev.x,o.positionPrev.y,2,0,2*Math.PI,!1),s.closePath());s.fillStyle="rgba(255,165,0,0.8)",s.fill()},o.bodyVelocity=function(e,t,n){var o=n;o.beginPath();for(var r=0;r<t.length;r++){var a=t[r];if(a.render.visible){var s=i.getVelocity(a);o.moveTo(a.position.x,a.position.y),o.lineTo(a.position.x+s.x,a.position.y+s.y)}}o.lineWidth=3,o.strokeStyle="cornflowerblue",o.stroke()},o.bodyIds=function(e,t,n){var o,i,r=n;for(o=0;o<t.length;o++)if(t[o].render.visible){var a=t[o].parts;for(i=a.length>1?1:0;i<a.length;i++){var s=a[i];r.font="12px Arial",r.fillStyle="rgba(255,255,255,0.5)",r.fillText(s.id,s.position.x+10,s.position.y-10)}}},o.collisions=function(e,t,n){var o,i,r,a,s=n,l=e.options;for(s.beginPath(),r=0;r<t.length;r++)if((o=t[r]).isActive)for(i=o.collision,a=0;a<o.contactCount;a++){var c=o.contacts[a].vertex;s.rect(c.x-1.5,c.y-1.5,3.5,3.5)}for(l.wireframes?s.fillStyle="rgba(255,255,255,0.7)":s.fillStyle="orange",s.fill(),s.beginPath(),r=0;r<t.length;r++)if((o=t[r]).isActive&&(i=o.collision,o.contactCount>0)){var u=o.contacts[0].vertex.x,d=o.contacts[0].vertex.y;2===o.contactCount&&(u=(o.contacts[0].vertex.x+o.contacts[1].vertex.x)/2,d=(o.contacts[0].vertex.y+o.contacts[1].vertex.y)/2),i.bodyB===i.supports[0].body||!0===i.bodyA.isStatic?s.moveTo(u-8*i.normal.x,d-8*i.normal.y):s.moveTo(u+8*i.normal.x,d+8*i.normal.y),s.lineTo(u,d)}l.wireframes?s.strokeStyle="rgba(255,165,0,0.7)":s.strokeStyle="orange",s.lineWidth=1,s.stroke()},o.separations=function(e,t,n){var o,i,r,a,s,l=n,c=e.options;for(l.beginPath(),s=0;s<t.length;s++)if((o=t[s]).isActive){r=(i=o.collision).bodyA;var u=1;(a=i.bodyB).isStatic||r.isStatic||(u=.5),a.isStatic&&(u=0),l.moveTo(a.position.x,a.position.y),l.lineTo(a.position.x-i.penetration.x*u,a.position.y-i.penetration.y*u),u=1,a.isStatic||r.isStatic||(u=.5),r.isStatic&&(u=0),l.moveTo(r.position.x,r.position.y),l.lineTo(r.position.x+i.penetration.x*u,r.position.y+i.penetration.y*u)}c.wireframes?l.strokeStyle="rgba(255,165,0,0.5)":l.strokeStyle="orange",l.stroke()},o.inspector=function(e,t){e.engine;var n,o=e.selected,i=e.render,r=i.options;if(r.hasBounds){var a=i.bounds.max.x-i.bounds.min.x,s=i.bounds.max.y-i.bounds.min.y,l=a/i.options.width,c=s/i.options.height;t.scale(1/l,1/c),t.translate(-i.bounds.min.x,-i.bounds.min.y)}for(var u=0;u<o.length;u++){var d=o[u].data;switch(t.translate(.5,.5),t.lineWidth=1,t.strokeStyle="rgba(255,165,0,0.9)",t.setLineDash([1,2]),d.type){case"body":n=d.bounds,t.beginPath(),t.rect(Math.floor(n.min.x-3),Math.floor(n.min.y-3),Math.floor(n.max.x-n.min.x+6),Math.floor(n.max.y-n.min.y+6)),t.closePath(),t.stroke();break;case"constraint":var p=d.pointA;d.bodyA&&(p=d.pointB),t.beginPath(),t.arc(p.x,p.y,10,0,2*Math.PI),t.closePath(),t.stroke()}t.setLineDash([]),t.translate(-.5,-.5)}null!==e.selectStart&&(t.translate(.5,.5),t.lineWidth=1,t.strokeStyle="rgba(255,165,0,0.6)",t.fillStyle="rgba(255,165,0,0.1)",n=e.selectBounds,t.beginPath(),t.rect(Math.floor(n.min.x),Math.floor(n.min.y),Math.floor(n.max.x-n.min.x),Math.floor(n.max.y-n.min.y)),t.closePath(),t.stroke(),t.fill(),t.translate(-.5,-.5)),r.hasBounds&&t.setTransform(1,0,0,1,0,0)};var n=function(e,t){var n=e.engine,i=e.timing,r=i.historySize,a=n.timing.timestamp;i.delta=t-i.lastTime||o._goodDelta,i.lastTime=t,i.timestampElapsed=a-i.lastTimestamp||0,i.lastTimestamp=a,i.deltaHistory.unshift(i.delta),i.deltaHistory.length=Math.min(i.deltaHistory.length,r),i.engineDeltaHistory.unshift(n.timing.lastDelta),i.engineDeltaHistory.length=Math.min(i.engineDeltaHistory.length,r),i.timestampElapsedHistory.unshift(i.timestampElapsed),i.timestampElapsedHistory.length=Math.min(i.timestampElapsedHistory.length,r),i.engineUpdatesHistory.unshift(n.timing.lastUpdatesPerFrame),i.engineUpdatesHistory.length=Math.min(i.engineUpdatesHistory.length,r),i.engineElapsedHistory.unshift(n.timing.lastElapsed),i.engineElapsedHistory.length=Math.min(i.engineElapsedHistory.length,r),i.elapsedHistory.unshift(i.lastElapsed),i.elapsedHistory.length=Math.min(i.elapsedHistory.length,r)},d=function(e){for(var t=0,n=0;n<e.length;n+=1)t+=e[n];return t/e.length||0},p=function(e,t){var n=document.createElement("canvas");return n.width=e,n.height=t,n.oncontextmenu=function(){return!1},n.onselectstart=function(){return!1},n},f=function(e){var t=e.getContext("2d");return(window.devicePixelRatio||1)/(t.webkitBackingStorePixelRatio||t.mozBackingStorePixelRatio||t.msBackingStorePixelRatio||t.oBackingStorePixelRatio||t.backingStorePixelRatio||1)},v=function(e,t){var n=e.textures[t];return n||((n=e.textures[t]=new Image).src=t,n)},m=function(e,t){var n=t;/(jpg|gif|png)$/.test(t)&&(n="url("+t+")"),e.canvas.style.background=n,e.canvas.style.backgroundSize="contain",e.currentBackground=t}}()},function(e,t,n){var o={};e.exports=o;var i=n(5),r=n(17),a=n(0);!function(){o._maxFrameDelta=1e3/15,o._frameDeltaFallback=1e3/60,o._timeBufferMargin=1.5,o._elapsedNextEstimate=1,o._smoothingLowerBound=.1,o._smoothingUpperBound=.9,o.create=function(e){var t=a.extend({delta:1e3/60,frameDelta:null,frameDeltaSmoothing:!0,frameDeltaSnapping:!0,frameDeltaHistory:[],frameDeltaHistorySize:100,frameRequestId:null,timeBuffer:0,timeLastTick:null,maxUpdates:null,maxFrameTime:1e3/30,lastUpdatesDeferred:0,enabled:!0},e);return t.fps=0,t},o.run=function(e,t){return e.timeBuffer=o._frameDeltaFallback,function n(i){e.frameRequestId=o._onNextFrame(e,n),i&&e.enabled&&o.tick(e,t,i)}(),e},o.tick=function(t,n,s){var l=a.now(),c=t.delta,u=0,d=s-t.timeLastTick;if((!d||!t.timeLastTick||d>Math.max(o._maxFrameDelta,t.maxFrameTime))&&(d=t.frameDelta||o._frameDeltaFallback),t.frameDeltaSmoothing){t.frameDeltaHistory.push(d),t.frameDeltaHistory=t.frameDeltaHistory.slice(-t.frameDeltaHistorySize);var p=t.frameDeltaHistory.slice(0).sort(),f=t.frameDeltaHistory.slice(p.length*o._smoothingLowerBound,p.length*o._smoothingUpperBound);d=e(f)||d}t.frameDeltaSnapping&&(d=1e3/Math.round(1e3/d)),t.frameDelta=d,t.timeLastTick=s,t.timeBuffer+=t.frameDelta,t.timeBuffer=a.clamp(t.timeBuffer,0,t.frameDelta+c*o._timeBufferMargin),t.lastUpdatesDeferred=0;var v=t.maxUpdates||Math.ceil(t.maxFrameTime/c),m={timestamp:n.timing.timestamp};i.trigger(t,"beforeTick",m),i.trigger(t,"tick",m);for(var y=a.now();c>0&&t.timeBuffer>=c*o._timeBufferMargin;){i.trigger(t,"beforeUpdate",m),r.update(n,c),i.trigger(t,"afterUpdate",m),t.timeBuffer-=c,u+=1;var g=a.now()-l,x=a.now()-y,h=g+o._elapsedNextEstimate*x/u;if(u>=v||h>t.maxFrameTime){t.lastUpdatesDeferred=Math.round(Math.max(0,t.timeBuffer/c-o._timeBufferMargin));break}}n.timing.lastUpdatesPerFrame=u,i.trigger(t,"afterTick",m),t.frameDeltaHistory.length>=100&&(t.lastUpdatesDeferred&&Math.round(t.frameDelta/c)>v?a.warnOnce("Matter.Runner: runner reached runner.maxUpdates, see docs."):t.lastUpdatesDeferred&&a.warnOnce("Matter.Runner: runner reached runner.maxFrameTime, see docs."),void 0!==t.isFixed&&a.warnOnce("Matter.Runner: runner.isFixed is now redundant, see docs."),(t.deltaMin||t.deltaMax)&&a.warnOnce("Matter.Runner: runner.deltaMin and runner.deltaMax were removed, see docs."),0!==t.fps&&a.warnOnce("Matter.Runner: runner.fps was replaced by runner.delta, see docs."))},o.stop=function(e){o._cancelNextFrame(e)},o._onNextFrame=function(e,t){if("undefined"==typeof window||!window.requestAnimationFrame)throw new Error("Matter.Runner: missing required global window.requestAnimationFrame.");return e.frameRequestId=window.requestAnimationFrame(t),e.frameRequestId},o._cancelNextFrame=function(e){if("undefined"==typeof window||!window.cancelAnimationFrame)throw new Error("Matter.Runner: missing required global window.cancelAnimationFrame.");window.cancelAnimationFrame(e.frameRequestId)};var e=function(e){for(var t=0,n=e.length,o=0;o<n;o+=1)t+=e[o];return t/n||0}}()},function(e,t,n){var o={};e.exports=o;var i=n(8),r=n(0).deprecated;o.collides=function(e,t){return i.collides(e,t)},r(o,"collides","SAT.collides ➤ replaced by Collision.collides")},function(e,t,n){var o={};e.exports=o;n(1);var i=n(0);o.pathToVertices=function(e,t){"undefined"==typeof window||"SVGPathSeg"in window||i.warn("Svg.pathToVertices: SVGPathSeg not defined, a polyfill is required.");var n,r,a,s,l,c,u,d,p,f,v,m=[],y=0,g=0,x=0;t=t||15;var h=function(e,t,n){var o=n%2==1&&n>1;if(!p||e!=p.x||t!=p.y){p&&o?(f=p.x,v=p.y):(f=0,v=0);var i={x:f+e,y:v+t};!o&&p||(p=i),m.push(i),g=f+e,x=v+t}},b=function(e){var t=e.pathSegTypeAsLetter.toUpperCase();if("Z"!==t){switch(t){case"M":case"L":case"T":case"C":case"S":case"Q":g=e.x,x=e.y;break;case"H":g=e.x;break;case"V":x=e.y}h(g,x,e.pathSegType)}};for(o._svgPathToAbsolute(e),a=e.getTotalLength(),c=[],n=0;n<e.pathSegList.numberOfItems;n+=1)c.push(e.pathSegList.getItem(n));for(u=c.concat();y<a;){if((l=c[e.getPathSegAtLength(y)])!=d){for(;u.length&&u[0]!=l;)b(u.shift());d=l}switch(l.pathSegTypeAsLetter.toUpperCase()){case"C":case"T":case"S":case"Q":case"A":s=e.getPointAtLength(y),h(s.x,s.y,0)}y+=t}for(n=0,r=u.length;n<r;++n)b(u[n]);return m},o._svgPathToAbsolute=function(e){for(var t,n,o,i,r,a,s=e.pathSegList,l=0,c=0,u=s.numberOfItems,d=0;d<u;++d){var p=s.getItem(d),f=p.pathSegTypeAsLetter;if(/[MLHVCSQTA]/.test(f))"x"in p&&(l=p.x),"y"in p&&(c=p.y);else switch("x1"in p&&(o=l+p.x1),"x2"in p&&(r=l+p.x2),"y1"in p&&(i=c+p.y1),"y2"in p&&(a=c+p.y2),"x"in p&&(l+=p.x),"y"in p&&(c+=p.y),f){case"m":s.replaceItem(e.createSVGPathSegMovetoAbs(l,c),d);break;case"l":s.replaceItem(e.createSVGPathSegLinetoAbs(l,c),d);break;case"h":s.replaceItem(e.createSVGPathSegLinetoHorizontalAbs(l),d);break;case"v":s.replaceItem(e.createSVGPathSegLinetoVerticalAbs(c),d);break;case"c":s.replaceItem(e.createSVGPathSegCurvetoCubicAbs(l,c,o,i,r,a),d);break;case"s":s.replaceItem(e.createSVGPathSegCurvetoCubicSmoothAbs(l,c,r,a),d);break;case"q":s.replaceItem(e.createSVGPathSegCurvetoQuadraticAbs(l,c,o,i),d);break;case"t":s.replaceItem(e.createSVGPathSegCurvetoQuadraticSmoothAbs(l,c),d);break;case"a":s.replaceItem(e.createSVGPathSegArcAbs(l,c,p.r1,p.r2,p.angle,p.largeArcFlag,p.sweepFlag),d);break;case"z":case"Z":l=t,c=n}"M"!=f&&"m"!=f||(t=l,n=c)}}},function(e,t,n){var o={};e.exports=o;var i=n(6);n(0);o.create=i.create,o.add=i.add,o.remove=i.remove,o.clear=i.clear,o.addComposite=i.addComposite,o.addBody=i.addBody,o.addConstraint=i.addConstraint}])}));</script>
+<script>/*
+ * world.js — 「一颗弹珠，让整间实验室下班」机械连锁装置（纯逻辑层，无 DOM）
+ *
+ * 因果链（每一环都由上一环的真实碰撞/接触触发）：
+ *   人释放小球 → 小球滚下曲坡道 → 压下跷跷板左盘 → 跷跷板右臂尖端上抬，
+ *   插入闸门底舌下方把它顶起（闸门是套在轨道上的套筒：顶叉口挂在静态销上防倾，
+ *   板底开槽让轨道穿过）→ 闸门挡车齿抬起，小车沿斜轨滑下 → 撞倒第一块多米诺 → 连锁倾倒，
+ *   高塔砸下压到敲锤短臂 → 敲锤长臂头部上摆撞到铃 → 铃声响起 + 指示牌翻到「下班」
+ *
+ * 能量来源：只有小球初始重力势能（释放高度可 ±5% 调节）。无弹簧、无中途隐形施力。
+ * 事件日志只由 Matter 的 collisionStart 真实碰撞对或刚体状态量（角度/位置阈值）产生，
+ * 不用"标签变量切换"伪造接触。
+ *
+ * 几何全部程序化推导：先水平创建跷跷板复合刚体，再绕枢轴转 +2°，
+ * 闸门/顶杆/限位/小车的位置都从梁上凸轮的实际位置推出来，避免手算错位。
+ *
+ * 本文件同时被浏览器（main.js）与 Node 无头测试（test/headless.js）使用。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.MarbleWorld = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var DEG = Math.PI / 180;
+  var STEP_MS = 1000 / 60; // 固定步长：暂停 = 不再 step，无后台计时
+
+  function rotY(px, py, ang, lx, ly) { // y-down 世界
+    var c = Math.cos(ang), s = Math.sin(ang);
+    return { x: px + lx * c - ly * s, y: py + lx * s + ly * c };
+  }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  // 世界点 → 刚体局部坐标（Matter 约束 pointB 用局部系，会被 body.angle 旋转）
+  function localOf(body, worldPoint) {
+    var dx = worldPoint.x - body.position.x, dy = worldPoint.y - body.position.y;
+    var c = Math.cos(-body.angle), s = Math.sin(-body.angle);
+    return { x: dx * c - dy * s, y: dx * s + dy * c };
+  }
+
+  // 向心 Catmull-Rom（无过冲波纹），按弦长参数化
+  function sampleCurve(points, n) {
+    var P = points.map(function (p) { return { x: p[0], y: p[1] }; });
+    var m = P.length;
+    // 直接实现标准向心 CR 单段求值
+    function seg(p0, p1, p2, p3, s) { // s∈[0,1]
+      var t1 = Math.pow(Math.hypot(p1.x - p0.x, p1.y - p0.y), 0.5) || 1e-6;
+      var t2 = t1 + (Math.pow(Math.hypot(p2.x - p1.x, p2.y - p1.y), 0.5) || 1e-6);
+      var t3 = t2 + (Math.pow(Math.hypot(p3.x - p2.x, p3.y - p2.y), 0.5) || 1e-6);
+      var t = t1 + (t2 - t1) * s;
+      function L(a, b, ta, tb) { var k = (tb === ta) ? 0 : (t - ta) / (tb - ta); return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }; }
+      var A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+      var B1 = L(A1, A2, 0, t2), B2 = L(A2, A3, t1, t3);
+      return L(B1, B2, t1, t2);
+    }
+    var out = [];
+    for (var k = 0; k < n; k++) {
+      var g = (k / (n - 1)) * (m - 1);
+      var k2 = Math.min(Math.floor(g), m - 2), u = g - k2;
+      var q0 = P[Math.max(0, k2 - 1)], q1 = P[k2], q2 = P[k2 + 1], q3 = P[Math.min(m - 1, k2 + 2)];
+      out.push(seg(q0, q1, q2, q3, u));
+    }
+    for (var j = 0; j < out.length; j++) {
+      var a = out[Math.max(0, j - 1)], b = out[Math.min(out.length - 1, j + 1)];
+      var dx = b.x - a.x, dy = b.y - a.y, L2 = Math.hypot(dx, dy) || 1;
+      out[j].tx = dx / L2; out[j].ty = dy / L2;
+    }
+    return out;
+  }
+
+  var STAGES = ['待释放', '小球释放', '跷跷板触发', '闸门升起', '小车滑行', '多米诺连锁', '敲铃·下班'];
+
+  function createWorld(Matter, userOpts) {
+    var Engine = Matter.Engine, Bodies = Matter.Bodies, Body = Matter.Body,
+        Constraint = Matter.Constraint, Composite = Matter.Composite, Events = Matter.Events;
+
+    var opts = Object.assign({ gravityScale: 1, releaseScale: 1 }, userOpts || {});
+
+    var C = {
+      deskSegs: [{ x: 340, y: 790, w: 600, h: 60 }, { x: 1710, y: 790, w: 300, h: 60 }], // 机器区前方留空
+      ballR: 16, ballDensity: 0.006, // 小球是整机唯一能量源：须有足够重力力矩卸载右限位（球 797 vs 闸门 142 + 配重 50）
+      rampPoints: [[95, 430], [135, 515], [210, 583], [280, 638], [345, 668], [375, 682], [388, 684]], // 低坡道，末端止于梁左尖之前（尖端下摆 9.6px 的扫掠净空）
+      rampN: 40,
+      pivot: { x: 590, y: 716 },
+      beamLen: 400, beamTh: 14, beamArmL: 185, beamArmR: 179, // 左臂尖至 −152，右臂尖至 +186：右尖扫掠避开高位闸门的舌/叉口带
+      restAngle: 0, // 梁水平休眠：滚轮顶(696.5)与闸门舌底(703.1)之间留出 6.6px 空程——
+      // 出生零受载链（闸门挂在静态轴肩上，梁自由压在右限位），释放后梁自由甩动穿过空程、高速撞舌
+      downAngle: -0.9 * DEG,
+      // 套筒闸门：轨道穿过闸门板底的开槽，导轨夹块从两侧贴住轨道（零摩擦、防倾、定横向）；
+      // 没有立柱/曲柄——跷跷板右臂尖滚轮直接托在闸门底舌下方（出生即 0.14px 预载，无撞击）
+      gateX: 782,               // 闸门中心 x（滚轮接触点扫掠 783.3→781.1，始终在底舌面内）
+      gate: { w: 20, h: 127, density: 0.00006 }, // 上段板 500..627；轻质化：顶升须在求解器冻结建立前十几步内冲完（动不起来就会被位置投影墙锁死）
+      peg: { w: 8, h: 16 },     // 挡车齿：闸门左缘 772..780 向下伸到 643；竖直齿面钩住滑盒车头带(~639.8..643 重叠 ~3.2px)拦阻；闸升 ≥3.3px 放行（夹持位 R7.7 → 净距 4.4px）
+      tongue: { h: 25.6, top: 677.5 }, // 底舌 677.5..703.1：槽深须吞掉整个顶升行程——轨道底面(666.4)是硬上限，
+      // 舌顶出生留 11.1px 隙，升 9.1px 后仍余 2px；底面出生即压在滚轮顶 0.12px 预载
+      roller: { lx: 190, ly: -2.3, r: 4 }, // 臂尖滚轮（零摩擦）：接触点正上方即闸门质心(782)，无翻倒扭矩：圆-平面接触流形最良
+      fork: { bridgeH: 6 }, // 叉口桥板厚度
+      // （旧 lipL/lipR 挡舌与左限位已删除：垂直挡墙与臂面构成楔紧，位置校正在楔紧里产生反向卡死扭矩）
+      counterw: { lx: 160, ly: 15, w: 30, h: 16 }, // 右臂配重：左接球窝力矩 69120 vs 配重 76800（净 +7680 右压），把水平梁紧压在右限位
+      cart: { w: 34, h: 12 },    // 滑橇盒：零摩擦（声明近似），按坡角预倾出生；盒顶被挡车齿钩住 1.75px 拦阻
+      trackSlope: 0.1286,       // ≈7.3°
+      trackX2: 900, flatEnd: 960, trackX1: 700,
+      crossY: 660,              // 闸门处轨面高度（高位，让梁/凸轮从下方穿过）
+      baffle: { x: 838, w: 14, h: 30 }, // 距闸 ~66px：到达 ~1.36px/step，低于隧穿阈值，挡板能诚实冻住小车（890 处 2.28px/step 会隧穿）；车头触板时车中心已过 812 → 环节4 已记录，停点信息准确
+      shelfDrop: 8.0,           // 台面比轨道水平段低一点（小车车身从 Domino 腰部撞击）
+      domino: { w: 12, h: 58, n: 6, x0: 950, dx: 48, density: 0.0012 }, // 6 块×48px：级联节拍靠"自由落体 38° 后猛撞下一块"，非蠕推（块间面隙 36px = 58·sin38°）
+      tower: { w: 16, h: 104, x: 1240 },
+      hammer: { px: 1385, armW: 8, ang: -16.4 * DEG, padL: 55, headL: 100,
+               pad: { w: 40, h: 14 }, head: { w: 16, h: 14 }, stopDX: 60 },
+      bell: { x: 1490, r: 26 },
+      bumper: { x: 350, y: 754, w: 14, h: 12 }
+    };
+
+
+    var engine, bodies, ball, beam, beamParts, gate, rod, cart, cartBody, cartBall, wheels, hammer,
+        latch, baffleBody, lockBlock;
+    var listeners = [], pendingPairs = [];
+    var state, log, stats, flags, simT;
+
+    function reset() {
+      // 睡眠全局开启：静息刚体（尤其高塔翻板——重体+软枢轴会被求解器迭代顺序
+      // 系统性馈能，几分钟内慢慢爬过竖直自倒，无因敲铃）入睡后免疫漂移；
+      // 真实碰撞（#8 撞塔等）会自动唤醒，因果链不受影响
+      engine = Engine.create({ enableSleeping: true, positionIterations: 2, velocityIterations: 8 });
+      engine.gravity.y = opts.gravityScale;
+      simT = 0; pendingPairs = []; flags = {};
+      state = {
+        released: false, releaseAnim: -1, locked: false, baffleIn: false,
+        gravityScale: opts.gravityScale, releaseScale: opts.releaseScale,
+        stage: 0, stageT: [0], done: false, t: 0
+      };
+      log = [];
+      stats = { collisions: 0, acausal: 0, soundDelays: [], stopStage: 0, stopReason: '', bellHitT: -1 };
+      build();
+      return api;
+    }
+
+    function seg(x1, y1, x2, y2, th, o) {
+      o = o || {};
+      var cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, L = Math.hypot(x2 - x1, y2 - y1);
+      // 默认 +2 浅重叠隐藏端棱；exact=true 时恰好对接（曲线密段用——平底滑盒会被
+      // 重叠锯齿的多点接触冻结，而 ≤0.5° 的对接折角可被视为光滑）
+      var len = o.exact ? L : L + 2;
+      var opts = Object.assign({
+        angle: Math.atan2(y2 - y1, x2 - x1), isStatic: true, friction: 0.05, restitution: 0
+      }, o);
+      delete opts.exact;
+      return Bodies.rectangle(cx, cy, len, th, opts);
+    }
+
+    function build() {
+      bodies = {};
+      var add = function (b, key) { Composite.add(engine.world, b); if (key) bodies[key] = b; return b; };
+
+      // 桌面（两段，中间是机器区）
+      C.deskSegs.forEach(function (d, i) {
+        add(Bodies.rectangle(d.x, d.y, d.w, d.h, { isStatic: true, label: 'desk', friction: 0.5 }), 'desk' + i);
+      });
+
+      // 曲坡道（深重叠多段近似光滑曲线；无顶棚，滚动不会跳离）
+      var curve = sampleCurve(C.rampPoints, C.rampN);
+      C.curve = curve;
+      for (var i = 0; i < curve.length - 1; i++) {
+        var a = curve[i], b = curve[i + 1];
+        add(seg(a.x, a.y, b.x, b.y, 14, { label: 'ramp#' + i, friction: 0.01 }));
+      }
+
+      // 小球（releaseScale 沿切向精确微调 ±5% 释放高度）
+      var base = curve[2];
+      var dh = (opts.releaseScale - 1) * 543;
+      var dd = dh / Math.max(0.55, base.ty);
+      var bx = base.x - base.tx * dd + base.ty * (7 + C.ballR - 0.5); // 7 = 坡道半厚，球心贴面不嵌入
+      var by = base.y - base.ty * dd - base.tx * (7 + C.ballR - 0.5);
+      C.ballStart = { x: bx, y: by };
+      ball = add(Bodies.circle(bx, by, C.ballR, {
+        label: 'ball', density: C.ballDensity, friction: 0.01, frictionStatic: 0.05, restitution: 0.05
+      }), 'ball');
+      latch = add(Bodies.rectangle(bx + base.tx * 23, by + base.ty * 23, 12, 30, {
+        isStatic: true, label: 'latch', angle: Math.atan2(base.ty, base.tx), friction: 0.1
+      }), 'latch');
+
+      // 跷跷板：轴块(锚定枢轴) + 左右臂 + 挡边。右臂尖端就是顶闸门的凸轮（无立柱/曲柄：
+      // 立柱扫掠区与轨道面是空间冲突的，套筒闸门让凸轮只做纯上托运动）
+      var pv = C.pivot;
+      var axle = Bodies.rectangle(pv.x, pv.y, 14, C.beamTh);
+      var armL = Bodies.rectangle(pv.x - 7 - C.beamArmL / 2, pv.y, C.beamArmL, C.beamTh);
+      var armR = Bodies.rectangle(pv.x + 7 + C.beamArmR / 2, pv.y, C.beamArmR, C.beamTh);
+      // 接球窝：窝口就是臂尖（坡道末端正下方，球离坡后直接掉入），窝底比臂面低 7px，窝底尾端立 32 高背墙
+      // 球在窝底是纯垂向承托（无楔紧），背墙只受水平微力（W·sinβ）——垂直挡墙方案已否：
+      // 球在墙+臂面楔紧里 Matter 位置校正会产生反向卡死扭矩；先前沿臂面滑入的窝口会挂住球也不可用
+      var armL2 = Bodies.rectangle(pv.x - 79.5, pv.y, 145, C.beamTh);           // 枢轴段 lx −152..−7
+      var sockFloor = Bodies.rectangle(pv.x - 172, pv.y - 17, 40, 6);            // 窝底 lx −192..−152，顶面 ly −14
+      var sockWall = Bodies.rectangle(pv.x - 152, pv.y - 36, 6, 32);             // 背墙 lx −155..−149，ly −52..−20
+      var counterw = Bodies.rectangle(pv.x + C.counterw.lx, pv.y + C.counterw.ly, C.counterw.w, C.counterw.h);
+      var roller = Bodies.circle(pv.x + C.roller.lx, pv.y + C.roller.ly, C.roller.r, { label: 'roller', friction: 0 });
+      beam = Body.create({ parts: [axle, armL2, armR, sockFloor, sockWall, counterw, roller], label: 'beam', friction: 0.3, restitution: 0, frictionAir: 0.08 }); // 梁阻尼：耗散甩鞭回弹，使滚轮撞舌后留在舌底持续上顶而非弹开
+      Body.rotate(beam, C.restAngle); // 绕质心转
+      var dMain = { x: pv.x - beam.parts[1].position.x, y: pv.y - beam.parts[1].position.y };
+      Body.setPosition(beam, { x: beam.position.x + dMain.x, y: beam.position.y + dMain.y }); // 轴块中心对准枢轴
+      add(beam, 'beam');
+      // 枢轴支柱（纯装饰性静件，托住轴的视觉；与梁底留 2px）
+      add(Bodies.rectangle(pv.x, (pv.y + 9 + 760) / 2 + 1, 12, 760 - pv.y - 9 - 2, { isStatic: true, label: 'beamPost', friction: 0.5 }), 'beamPost');
+      add(Constraint.create({
+        pointA: { x: pv.x, y: pv.y }, bodyB: beam,
+        pointB: { x: pv.x - beam.position.x, y: pv.y - beam.position.y }, // 世界系偏移（Matter 按相对转角旋转）
+        stiffness: 1, length: 0, label: 'beamPivot'
+      }), 'beamPivot');
+
+      // 限位：只有右限位（水平梁压在它上面休眠）。左限位已删除——甩鞭会隧穿静件，
+      // 闸门由棘爪保持在高位，梁过转到哪都是无害的化妆效果
+      var rsP = rotY(pv.x, pv.y, C.restAngle, 184, C.beamTh / 2);
+      add(Bodies.rectangle(rsP.x, rsP.y + 5 - 0.3, 14, 10, { isStatic: true, label: 'rightStop', angle: C.restAngle }), 'rightStop');
+
+      // ---- 套筒闸门：上段板 + 挡车齿 + 底舌 + 顶叉口；板底开槽（627~677）让轨道穿过 ----
+      // 支撑链（v6）：出生桥板搁在静态轴肩上（零受载）→ 甩鞭撞舌把闸门抛上去（摩擦空气 1.0 限速），
+      // 上行 7.5px 后桥板底面撞上静态承接台锁定高位——全程无持续受载接触链（Matter 位置投影
+      // 墙会让任何准静态压载链冻结成不动点；动力学冲击+静态件承托是可靠的解）
+      var slopeTh = Math.atan(C.trackSlope); // 轨道倾角（y-down，+x 下坡）；挡车齿/止动销都按此角预倾以贴合滑盒端面
+      var stackX = C.gateX;
+      C.stackX = stackX;
+      var slabTop = 500, notchTop = 627; // 上段板 500..627，槽顶 627（高于车轮盘面顶 643 16px，高于车身顶 636 9px）
+      var gFr = 0; // 闸门全域零摩擦：升降/滑移无楔
+      var upper = Bodies.rectangle(stackX, (slabTop + notchTop) / 2, C.gate.w, notchTop - slabTop, { density: C.gate.density, friction: gFr });
+      // 挡车齿：闸门左缘 772..780 向下伸到 645；探入车身顶(636) 9px / 轮盘顶(643) 2px；闸升 7.5px 后齿底(637.5)高于车身顶(638.6) 1.1px 放行
+      var peg = Bodies.rectangle(stackX - C.gate.w / 2 + C.peg.w / 2, notchTop + C.peg.h / 2, C.peg.w, C.peg.h, { density: C.gate.density, friction: gFr }); // 竖直齿面挡竖直车头面（滑盒水平出生、自调倾角）；齿底须高于盒顶才算放行
+      // 底舌：677.5..703.1（顶面出生低于轨道底面 11.1px，给 7.5px 顶升行程留净空 3.6px）；底面与滚轮顶出生留 6.6px 空程
+      var tongue = Bodies.rectangle(stackX, C.tongue.top + C.tongue.h / 2, C.gate.w, C.tongue.h, { density: C.gate.density, friction: gFr });
+      // 顶叉口：颊板带 473.35..482.35 夹导轨（与轨面各留 0.15px 隙，全程骑轨 200..489），
+      // 桥板两半带 467.35..473.35（与轨面各留 0.3px 隙让槽）：桥板底面出生即搁在静态轴肩上（0.15 预载），
+      // 闸门升 7.5px 后桥板底面(465.85)撞上静态承接台锁定——滚轮与舌底出生留 6.6px 空程（零受载出生链）
+      var cheekL = Bodies.rectangle(stackX - 4.15, slabTop - 22.15, 4, 9, { density: 0.0004, friction: gFr });
+      var cheekR = Bodies.rectangle(stackX + 4.15, slabTop - 22.15, 4, 9, { density: 0.0004, friction: gFr });
+      var bridgeL = Bodies.rectangle(stackX - 7.15, slabTop - 29.65, 9.7, C.fork.bridgeH, { density: 0.0004, friction: gFr });
+      var bridgeR = Bodies.rectangle(stackX + 7.15, slabTop - 29.65, 9.7, C.fork.bridgeH, { density: 0.0004, friction: gFr });
+      // 配重帽：闸门的质心必须落在滚轮接触点(782)正上方——左缘的挡车齿把质心拉偏，这块 6×24 铜帽(+789)补回
+      var balance = Bodies.rectangle(stackX + 7, slabTop + 12, 6, 24, { density: C.gate.density, friction: gFr });
+      gate = Body.create({ parts: [upper, peg, tongue, cheekL, cheekR, bridgeL, bridgeR, balance], label: 'gate', friction: 0, restitution: 0, frictionAir: 0.15 }); // 阻尼限飞行：1.0=每步清零悬空锁死；0.15 保留弹道射程，触顶/回落由上限位+滚轮夹持接管
+      add(gate, 'gate');
+      rod = gate; // 别名，供探针使用
+      // 垂直导轨（静态）：闸门顶叉口的全程滑轨，底端 489（出生颊板带 473.35..482.35 包住轨下端 8.65px，
+      // 升满 7.5 后颊板带 465.85..474.85 仍全程骑轨；轨底端 489 比升满后上段板顶(492.5)低——上段板永不相撞）；
+      // 底部轴肩两块（顶面 473.2）：出生桥板底面(473.35)搁在其上（0.15 预载）——闸门重量由静态件承担
+      var railBar = Bodies.rectangle(stackX, 344.5, 4, 289, { friction: 0 });
+      var collarL = Bodies.rectangle(stackX - 10, slabTop - 23.8, 7.4, 6, { friction: 0 });
+      var collarR = Bodies.rectangle(stackX + 10, slabTop - 23.8, 7.4, 6, { friction: 0 });
+      // 底舌上限位一块（底面 670.0 = 舌顶 677.5 − 7.5，厚 6 向上；横跨舌宽 772..792）：
+      // 舌顶升 7.5px 触顶不再上穿（防穿轨弹跳），回落瞬间滚轮已顶在舌底（触顶时梁尖角 ≥−3° 滚轮顶 ≥699.8，
+      // 舌底 695.6——跟随间隙 ≤4px，慢速对接不隧穿）——挡车齿底(637.5)让开车身顶(638.6) 1.1px，
+      // 滚轮上顶+上限位夹持成固定点（R=7.5 承接台方案已废弃：支撑点落在桥板出生体积内必重叠）
+      var tongueCeil = Bodies.rectangle(stackX, 667.0, 26, 6, { friction: 0 });
+      var gateRail = Body.create({ parts: [railBar, collarL, collarR, tongueCeil], isStatic: true, label: 'gateRail', friction: 0 });
+      add(gateRail, 'gateRail');
+      C.gate0Y = gate.parts[1].position.y; // 用上段板部件坐标（复合体父级坐标在受载时会漂移，不可信）
+
+      // ---- 轨道（高位连续无缝：套筒闸门不再需要在轨上开缺口）----
+      var gateFaceL = stackX - C.gate.w / 2;                   // 闸门面 x = 772
+      var crossX = gateFaceL - C.cart.w / 2;                   // 小车中心：车头盒面 0 隙贴闸门面（零摩擦滑车从静止准静态顶死挡车齿；留隙会被 settle 加速隧穿）
+      var crossY = C.crossY;                                   // 闸门处轨面中心线高度
+      var yAt = function (x) { return crossY + (x - (gateFaceL - 0.5)) * C.trackSlope; };
+      C.trackY = yAt;
+      add(seg(C.trackX1, yAt(C.trackX1), C.trackX2, yAt(C.trackX2), 10, { label: 'track1', friction: 0.15 }), 'track1');
+      // 纯坡道延伸到 #0 背面：多米诺区左移到 950（距闸 168px），行程损失使到达速度 ~1.8px/step
+      // 天然低于隧穿阈值——撞击是真实冲量，翻板被击离后自由倾倒，小车停在 #0 背面（无楔死）
+      add(seg(C.trackX2, yAt(C.trackX2), C.domino.x0 - 7, yAt(C.domino.x0 - 7), 10, { label: 'track3', friction: 0.15 }), 'track3');
+      C.flatY = yAt(C.flatEnd);
+      C.baffle.y = yAt(C.baffle.x) - 6.5; // 挡板横在滑盒高度带（盒中心 = 轨面顶 −6.1）
+
+      // ---- 滑车（零摩擦滑盒：Matter 求解器否决了一切轮式/载重方案——复合部件轮不能自转、静止接触里
+      // 摩擦冲量为零、双接触位置投影形成不动点：盒(μ>0)/双轮/单轮/滚珠轴承/球上骑笼全部冻结或蠕行；
+      // 唯一可靠的坡面运载是 μ=0 滑盒（无摩擦冲量可吃，重力分力持续加速）与自由滚动圆。故小车 =
+      // 抛光导轨上的无摩擦滑橇（README 声明的摩擦近似）。能量：滑车重力势能）----
+      var cartCx = crossX, cartCy = yAt(crossX) - 5 - C.cart.h / 2 + 0.5; // 水平出生（+0.5 浮高：settle 后角点触轨），下滑时自调坡角
+      cart = add(Bodies.rectangle(cartCx, cartCy, C.cart.w, C.cart.h, {
+        label: 'cart', density: 0.003, friction: 0, restitution: 0
+      }), 'cart');
+      // 拦阻联锁（静态，开闸事件撤除——能量与因果都来自闸门升起）：
+      //  cartChock 前部门闩：竖直面贴车头下沿带（647..653 深重叠 ~6px，盒重水平压持成不动点）；
+      //  cartStop  车尾止动销：防 settle 后溜。挡车齿只做视觉/二次拦阻（浅重叠擦碰不构成主拦阻）
+      add(Bodies.rectangle(cartCx + C.cart.w / 2 - 2, cartCy + 4.5, 4, 9, { isStatic: true, label: 'cartChock', friction: 0.1 }), 'cartChock');
+      add(Bodies.rectangle(cartCx - C.cart.w / 2 - 2, cartCy, 4, C.cart.h + 4, { isStatic: true, label: 'cartStop', friction: 0.1 }), 'cartStop');
+      cartBody = cart;
+      wheels = [];
+      C.cartStart = { x: cartCx, y: cartCy };
+
+      // ---- 多米诺台面（翻板阵列：每块骨牌是绕底座中心枢轴旋转的杠杆——
+      // 工作近似声明：自由站立骨牌在 Matter 顺序冲量求解器里会把撞击动量经底座接触泄进静态大地，
+      // 低速推永远翻不倒、高速推隧穿。枢轴化后任何高于底座的正向撞击都产生确定的前翻力矩，
+      // 摩擦力不再参与因果链，完全符合"杠杆近似需声明"的约束）----
+      var shelfTop = C.flatY + C.shelfDrop;
+      C.shelfTop = shelfTop;
+      add(Bodies.rectangle(1130, shelfTop + 5, 400, 10, { isStatic: true, label: 'shelf', friction: 0.9 }), 'shelf'); // 930..1330
+      for (var d = 0; d < C.domino.n; d++) {
+        var dx0 = C.domino.x0 + d * C.domino.dx;
+        var tile = Bodies.rectangle(dx0, shelfTop - 4 - C.domino.h / 2,
+          C.domino.w, C.domino.h, { label: 'domino#' + d, density: C.domino.density, friction: 0.9, restitution: 0 });
+        Body.rotate(tile, -0.6 * DEG); // 预倾：过顶攀爬的势能垒减半，释放后更快被推倒（锁扣下静息由枢轴保持，不靠限位桩）
+        Body.setStatic(tile, true); // 骨牌锁扣（先动后静缓存质量）：被运动刚体真实撞醒才脱扣，见 settleCollisions
+        add(tile, 'domino#' + d);
+        // 枢轴抬离台面 4px：底座悬空，前底角不会埋入台面形成引力回摆陷阱——
+        // 纯转子零势垒，任何前向扰动都持续增长直至砸向下一块
+        add(Constraint.create({
+          pointA: { x: dx0, y: shelfTop - 4 }, bodyB: tile, pointB: { x: 0, y: C.domino.h / 2 },
+          stiffness: 1, length: 0, label: 'dominoPivot#' + d
+        }), 'dominoPivot#' + d);
+        // 后倾限位桩：挡住翻板保持竖直；桩顶须低于凌空车鼻下沿，免得成为小车路径上的墙
+        add(Bodies.rectangle(dx0 - C.domino.w / 2 - 2, shelfTop - 5, 4, 4,
+          { isStatic: true, label: 'backstop#' + d, friction: 0.2 }), 'backstop#' + d);
+      }
+      // （无挡车桩：小车撞击后自然停在 #0 背面 0.2px 的静息接触上——联锁撤除后因果链里只有真实接触）
+      // 高塔：绕底座枢轴的翻板（倒下时塔面上段扫过敲锤托盘）。
+      // 出生为静件——塔底锁扣咬住底座（见 settleCollisions 锁扣脱扣分支）：
+      // 重体+软枢轴的组合会被顺序求解器迭代顺序系统性馈能，几分钟内从 −1° 静息爬过
+      // 竖直自倒（锁定场景 5.4s 无因敲铃事故）；锁扣下静件免疫漂移，#8 真实撞击才脱扣。
+      // 密度 5x：压锤需要静态重量把锤盘推过平衡位（1.5x 靠在盘上不发声）；
+      // 且半重力（0.5x）下塔冲角要从 46° 提到 55°+ 才够得着锤盘——余量来自密度
+      var towerBody = Bodies.rectangle(C.tower.x, shelfTop - 4 - C.tower.h / 2, C.tower.w, C.tower.h,
+        { label: 'tower', density: C.domino.density * 5, friction: 0.9, restitution: 0 });
+      Body.setStatic(towerBody, true); // 必须"先动后静"： born-static 的刚体 setStatic(false) 不会恢复质量（Matter 只缓存动→静的原件）
+      Body.rotate(towerBody, -1 * DEG);
+      add(towerBody, 'tower');
+      add(Constraint.create({
+        pointA: { x: C.tower.x, y: shelfTop - 4 }, bodyB: towerBody, pointB: { x: 0, y: C.tower.h / 2 },
+        stiffness: 1, length: 0, label: 'towerPivot'
+      }), 'towerPivot');
+      add(Bodies.rectangle(C.tower.x - C.tower.w / 2 - 2, shelfTop - 5, 4, 4,
+        { isStatic: true, label: 'backstop#T', friction: 0.2 }), 'backstop#T');
+
+      // ---- 敲锤（短臂托盘在左迎高塔，长臂锤头在右击铃）----
+      var hp = C.hammer, ua = { x: Math.cos(hp.ang), y: Math.sin(hp.ang) };
+      hp.py = shelfTop - 72; // 托盘顶面 ≈ 台面 −65，正对高塔顶角扫掠高度
+      // 水平放置各零件后，绕支点转角（保证 hammer.angle 可读）
+      var arm = Bodies.rectangle(hp.px + (hp.headL - hp.padL) / 2, hp.py, hp.padL + hp.headL, hp.armW);
+      var pad = Bodies.rectangle(hp.px - hp.padL, hp.py, hp.pad.w, hp.pad.h);
+      var head = Bodies.rectangle(hp.px + hp.headL, hp.py, hp.head.w, hp.head.h);
+      hammer = Body.create({ parts: [arm, pad, head], label: 'hammer', density: 0.0012, friction: 0.3 });
+      var com0 = { x: hammer.position.x, y: hammer.position.y };
+      var pv0 = { x: hp.px, y: hp.py };
+      Body.rotate(hammer, hp.ang);
+      var c = Math.cos(hp.ang), s = Math.sin(hp.ang);
+      var rp = { // 支点随旋转后的位置
+        x: com0.x + c * (pv0.x - com0.x) - s * (pv0.y - com0.y),
+        y: com0.y + s * (pv0.x - com0.x) + c * (pv0.y - com0.y)
+      };
+      Body.setPosition(hammer, { x: hammer.position.x + (pv0.x - rp.x), y: hammer.position.y + (pv0.y - rp.y) });
+      add(hammer, 'hammer');
+      add(Constraint.create({
+        pointA: { x: hp.px, y: hp.py }, bodyB: hammer,
+        pointB: { x: hp.px - hammer.position.x, y: hp.py - hammer.position.y }, // 世界系偏移
+        stiffness: 1, length: 0, label: 'hammerPivot'
+      }), 'hammerPivot');
+      var headPart = hammer.parts[3];
+      // 静止限位：与锤臂同倾角（避免水平顶面的一角嵌入斜臂产生寄生力矩）
+      var stopTop = hp.py + C.hammer.stopDX * Math.tan(hp.ang) + (hp.armW / 2) / Math.cos(hp.ang) - 0.3;
+      add(Bodies.rectangle(hp.px + C.hammer.stopDX, stopTop + 5 * Math.cos(hp.ang), 16, 10,
+        { isStatic: true, label: 'hammerStop', angle: hp.ang }), 'hammerStop');
+      add(Bodies.rectangle(hp.px, (686 + shelfTop) / 2, 12, shelfTop - 686, { isStatic: true, label: 'hammerPost' }), 'hammerPost');
+
+      // ---- 铃（静挂；静止时锤头顶部与铃缘有约 14px 间隙）----
+      var headTopY = headPart.bounds.min.y;
+      C.bell.y = headTopY - 40;
+      var bellBody = Body.create({
+        parts: [
+          Bodies.circle(C.bell.x, C.bell.y, C.bell.r),
+          Bodies.rectangle(C.bell.x, C.bell.y - C.bell.r - 8, 10, 20)
+        ],
+        isStatic: true, label: 'bell'
+      });
+      add(bellBody, 'bell');
+      add(Bodies.rectangle(1782, (559 + 760) / 2, 12, 760 - 559, { isStatic: true, label: 'bellPost' }), 'bellPost');
+      add(Bodies.rectangle(1733, C.bell.y - C.bell.r - 20 + 6, 86, 12, { isStatic: true, label: 'bellArm' }), 'bellArm');
+
+      // 小球归宿的软挡块
+      add(Bodies.rectangle(C.bumper.x, C.bumper.y, C.bumper.w, C.bumper.h, { isStatic: true, label: 'bumper' }), 'bumper');
+
+      Events.on(engine, 'collisionStart', function (ev) {
+        for (var i = 0; i < ev.pairs.length; i++) pendingPairs.push(ev.pairs[i]);
+      });
+    }
+
+    // ------------------------------------------------------------ events
+    function emit(kind, msg, extra) {
+      var e = Object.assign({ t: simT, wall: nowMs(), kind: kind, msg: msg }, extra || {});
+      log.push(e);
+      for (var i = 0; i < listeners.length; i++) {
+        try { listeners[i](e); } catch (err) {}
+      }
+      return e;
+    }
+    function nowMs() { return (typeof performance !== 'undefined' ? performance.now() : Date.now()); }
+
+    function stageUp(n, msg) {
+      if (n <= state.stage) return;
+      if (n > state.stage + 1) {
+        stats.acausal++;
+        emit('diag', '⚠ 无因果跳级：' + STAGES[n] + ' 于环节 ' + state.stage + ' 之前出现');
+      }
+      state.stage = n;
+      while (state.stageT.length <= n) state.stageT.push(simT);
+      stats.stopStage = n;
+      emit('state', '【环节 ' + n + '/6】' + (msg || STAGES[n]), { stage: n });
+    }
+
+    function pairName(a, b) { return (a.label || 'body') + ' ↔ ' + (b.label || 'body'); }
+    function isPair(a, b, la, lb) {
+      var na = a.label || '', nb = b.label || '';
+      return (na === la && nb === lb) || (na === lb && nb === la);
+    }
+    function either(a, b, prefix) {
+      return (a.label || '').indexOf(prefix) === 0 || (b.label || '').indexOf(prefix) === 0;
+    }
+    function parent(b) { return b.parent && b.parent !== b ? b.parent : b; }
+
+    function settleCollisions() {
+      if (!pendingPairs.length) return;
+      var q = pendingPairs; pendingPairs = [];
+      for (var i = 0; i < q.length; i++) {
+        var a = parent(q[i].bodyA), b = parent(q[i].bodyB);
+        stats.collisions++;
+        var initial = simT < 80;
+        var extra = { pair: pairName(a, b), ids: a.id + '#' + b.id };
+
+        if (isPair(a, b, 'ball', 'beam')) {
+          if (!flags.ballBeam) {
+            flags.ballBeam = true;
+            stageUp(2, '小球压上跷跷板（真实接触 ball ↔ beam，id ' + extra.ids + '）');
+          } else if (!initial) emit('collision', '小球与跷跷板再次接触', extra);
+          continue;
+        }
+        // 锁扣脱扣（骨牌行 + 高塔共用模式）：这些绕底座枢轴的翻板是倒立摆几何
+        // （枢轴在底座、质心在半高），重体+软枢轴会被顺序求解器迭代顺序系统性
+        // 馈能，几分钟内从静息倾角爬过竖直自倒——无因连锁事故。对策：出生为静件
+        // （先动后静以缓存质量），被"运动中的动态刚体"（速度 >0.15px/step，滤掉
+        // 蠕变再触）真实碰撞才脱扣转自由翻倒。与小车拦阻联锁同一因果模式。
+        // 必须置于 stage-5 等分支之前：collisionStart 每对只发一次，先释放再判级。
+        var la = a.label || '', lb = b.label || '';
+        var latchA = (la === 'tower' || la.indexOf('domino#') === 0) && a.isStatic;
+        var latchB = (lb === 'tower' || lb.indexOf('domino#') === 0) && b.isStatic;
+        if ((latchA || latchB) && !initial) {
+          var lat = latchA ? a : b, oth = latchA ? b : a;
+          var liveKey = 'live_' + lat.label;
+          if (!flags[liveKey] && !oth.isStatic) {
+            flags[liveKey] = true;
+            Body.setStatic(lat, false);
+            Matter.Sleeping.set(lat, false);
+            emit('mechanism', (lat.label === 'tower' ? '塔底锁扣脱开：高塔' : '骨牌锁扣脱开：' + lat.label) +
+              '由静件转为自由翻倒（真实接触 ' + pairName(a, b) + '，id ' + extra.ids + '）', extra);
+          }
+        }
+        if (isPair(a, b, 'cart', 'domino#0') && !flags.cartDom) {
+          flags.cartDom = true;
+          stageUp(5, '小车撞上第一块多米诺（真实接触 cart ↔ domino#0，id ' + extra.ids + '）');
+          continue;
+        }
+        if (isPair(a, b, 'tower', 'hammer') && !flags.towerPad) {
+          flags.towerPad = true;
+          emit('mechanism', '高塔砸中敲锤托盘（真实接触 tower ↔ hammer，id ' + extra.ids + '）');
+          continue;
+        }
+        if (isPair(a, b, 'hammer', 'bell')) {
+          if (!flags.bell) {
+            flags.bell = true;
+            stats.bellHitT = simT;
+            stageUp(6, '锤头撞到铃！（真实接触 hammer ↔ bell，id ' + extra.ids + '）');
+            var ev = emit('bell', '🔔 铃被敲响 — 指示牌翻到「下班」', extra);
+            emit('sign', '指示牌：营业 → 下班（由敲铃事件驱动）', { cause: ev });
+          }
+          continue;
+        }
+        if (isPair(a, b, 'cart', 'baffle')) {
+          if (!flags.baffleHit) {
+            flags.baffleHit = true;
+            emit('intervention', '🧱 小车撞上挡板，流程受阻（真实接触 cart ↔ baffle，id ' + extra.ids + '）');
+          }
+          continue;
+        }
+        if (either(a, b, 'backstop#')) continue; // 翻板后限位桩：出生贴靠与回摆接触都不进日志
+        if (either(a, b, 'domino#') || a.label === 'tower' || b.label === 'tower') {
+          if (!initial && flags.cartDom) {
+            emit('collision', '多米诺碰撞 ' + pairName(a, b), extra);
+          }
+          continue;
+        }
+        var d = (q[i].collision && q[i].collision.depth) || 0;
+        if (isPair(a, b, 'cart', 'gate') || isPair(a, b, 'wheel', 'gate')) {
+          if (!initial && d >= 0.05) emit('collision', '车轮与闸门接触 ' + pairName(a, b) + '（深度 ' + d.toFixed(2) + '）', extra);
+          continue;
+        }
+        if (isPair(a, b, 'beam', 'gate')) { // 臂尖滚轮(梁部件) ↔ 底舌(闸门部件)：预载与顶升的接触证据
+          var gk = 'stack-' + (flags.ballBeam ? 'lift' : 'pre');
+          if (!flags[gk]) {
+            flags[gk] = true;
+            emit('mechanism', (flags.ballBeam ? '顶升接触：跷跷板臂尖滚轮托着闸门底舌上升（' : '装配预载：') + pairName(a, b) + '，id ' + extra.ids + '）', extra);
+          }
+          continue;
+        }
+        if (isPair(a, b, 'gate', 'gateRail')) { // 顶叉口骑垂直导轨：颊板间隙 0.15px 的滑动导向
+          if (!flags.gateRailPre) {
+            flags.gateRailPre = true;
+            emit('mechanism', '装配预载：闸门顶叉口骑上垂直导轨、桥板搁在轴肩上（gate ↔ gateRail，id ' + extra.ids + '）', extra);
+          }
+          if (!initial && d >= 0.05 && !flags.gateHung) { // 桥板飞升后落上承接台：闸门锁定在高位
+            flags.gateHung = true;
+            emit('mechanism', '闸门顶叉口桥板底面撞上上方承接台（gate ↔ gateRail，深度 ' + d.toFixed(2) + '：齿底让开车身，闸门锁定高位）', extra);
+          }
+          continue;
+        }
+        if (isPair(a, b, 'ball', 'latch')) continue;
+        if (isPair(a, b, 'beam', 'leftStop')) {
+          if (!initial && !flags.leftStop) { flags.leftStop = true; emit('mechanism', '跷跷板压到下限位（beam ↔ leftStop）', extra); }
+          continue;
+        }
+        if (isPair(a, b, 'beam', 'rightStop')) {
+          if (!initial && !flags.rightStop) { flags.rightStop = true; emit('mechanism', '跷跷板回到右限位（beam ↔ rightStop）', extra); }
+          continue;
+        }
+        if (!initial) emit('collision', '碰撞 ' + pairName(a, b), extra);
+      }
+    }
+
+    function detectState() {
+      if (state.done) return;
+      var ang = beam.angle;
+      if (flags.ballBeam && !flags.beamDown && ang < -0.4 * DEG) {
+        flags.beamDown = true;
+        emit('mechanism', '跷跷板被压下 ' + (ang / DEG).toFixed(2) + '°，臂尖滚轮经底舌上托闸门');
+      }
+      if (!flags.gateOpen && gate.parts[1].position.y < C.gate0Y - 6.4) {
+        flags.gateOpen = true;
+        stageUp(3, '闸门升起到位（gate.y ' + gate.position.y.toFixed(1) + '，挡车齿已高于车身顶），小车被放行');
+        ['cartChock', 'cartStop'].forEach(function (k) { // 撤除拦阻联锁
+          if (bodies[k]) {
+            Composite.remove(engine.world, bodies[k]);
+            emit('mechanism', k === 'cartChock' ? '前部门闩撤除：滑车车头解锁' : '车尾止动销撤除：滑车开始下滑');
+          }
+        });
+        Matter.Sleeping.set(cart, false); // 睡眠引擎下撤除静件无碰撞事件：必须显式唤醒，否则小车悬空不醒
+      }
+      if (flags.gateOpen && !flags.cartFree && cart.position.x > C.stackX + 30) {
+        flags.cartFree = true;
+        stageUp(4, '小车通过闸门平面（cart.x=' + cart.position.x.toFixed(1) + '）');
+      }
+      if (state.locked && flags.ballBeam && !flags.lockNoted && simT - state.lockT > 600 && ang > -0.4 * DEG) {
+        flags.lockNoted = true;
+        emit('intervention', '🔒 跷跷板被锁定：球已到位但横梁转角 ' + (ang / DEG).toFixed(1) + '°，后续机构保持静止');
+      }
+      if (flags.bell && !state.done) {
+        state.done = true;
+        finalize('链条完成：敲铃并切换指示牌');
+      }
+    }
+
+    function finalize(reason) {
+      stats.stopStage = state.stage;
+      if (state.stage === 6) stats.stopReason = '完成：' + reason;
+      else if (state.locked) stats.stopReason = '停在环节 2（跷跷板被锁定，因果链在此中断）';
+      else if (state.baffleIn) stats.stopReason = '停在环节 4（挡板挡住小车，因果链在此中断）';
+      else stats.stopReason = '停在环节 ' + state.stage + '（' + STAGES[state.stage] + '）';
+    }
+
+    // ------------------------------------------------------- public api
+    var api = {
+      Matter: Matter, C: C, STAGES: STAGES,
+      get engine() { return engine; },
+      get state() { return state; },
+      get log() { return log; },
+      get stats() { return stats; },
+      get bodies() { return bodies; },
+      step: function (dt) {
+        if (state.done) return;
+        if (state.releaseAnim >= 0) {
+          state.releaseAnim += dt;
+          if (state.releaseAnim >= 140) {
+            Composite.remove(engine.world, latch); latch = null; state.releaseAnim = -1;
+            emit('mechanism', '释放插销完全撤出，小球开始滚动');
+          } else {
+            Body.setPosition(latch, { x: latch.position.x + latch.__dx / 140 * dt, y: latch.position.y + latch.__dy / 140 * dt });
+          }
+        }
+        Engine.update(engine, dt);
+        simT += dt; state.t = simT;
+        settleCollisions();
+        detectState();
+      },
+      release: function () {
+        if (state.released) return false;
+        state.released = true;
+        stageUp(1, '释放插销撤出，小球沿坡滚动');
+        Matter.Sleeping.set(ball, false); // 防用户久置后球已入睡、插销撤出无碰撞可唤醒
+        var p0 = C.curve[2];
+        latch.__dx = p0.ty * 46; latch.__dy = -p0.tx * 46;
+        state.releaseAnim = 0;
+        emit('op', '👆 操作：释放小球（releaseScale=' + opts.releaseScale.toFixed(3) +
+          '，释放点距跷跷板盘面 ' + Math.round(700 - 23 - C.ballStart.y) + 'px）');
+        return true;
+      },
+      lockSeesaw: function () {
+        if (!api.can.lockSeesaw()) return false;
+        state.locked = true; state.lockT = simT;
+        // 楔块垫在球窝底正下方（球窝底面 = 枢轴 y−14；梁左端可旋转部分里最靠下的水平面）。
+        // lx −170 处没有梁臂（臂尖 −152），旧算法按臂底面 y+7 放置 = 悬在球窝下方 20px 的空气里，什么都没挡。
+        // 0.3px 预压嵌入球窝底面，球落进窝里的冲击经楔块直泄静态大地 → 准静态冻结。
+        var bx = C.pivot.x - 178, top = C.pivot.y - 14.3;
+        lockBlock = Bodies.rectangle(bx, top + 20, 20, 40, { isStatic: true, label: 'lockBlock', friction: 0.4 });
+        Composite.add(engine.world, lockBlock);
+        bodies.lockBlock = lockBlock;
+        emit('intervention', '🔒 干预（事件节点：球已释放、尚未接触跷跷板）：锁定楔块插入，跷跷板被固定');
+        return true;
+      },
+      insertBaffle: function () {
+        if (!api.can.insertBaffle()) return false;
+        state.baffleIn = true;
+        baffleBody = Bodies.rectangle(C.baffle.x, C.baffle.y - 60, C.baffle.w, C.baffle.h,
+          { isStatic: true, label: 'baffle', friction: 0.3 });
+        Composite.add(engine.world, baffleBody);
+        bodies.baffle = baffleBody;
+        state.baffleAnim = 0;
+        emit('intervention', '🧱 干预（事件节点：闸门开启后、小车进入多米诺区前）：挡板插入轨道');
+        return true;
+      },
+      setGravity: function (s) { // s = 标称重力比例（0.5 = 减半）；内部 px 步长单位不泄漏给调用方
+        state.gravityScale = s; engine.gravity.y = opts.gravityScale * s;
+        emit('intervention', '⚖️ 干预：重力调为标称的 ' + Math.round(s * 100) + '%（g=' + (opts.gravityScale * s).toFixed(3) + ' px/步²）');
+      },
+      setReleaseScale: function (s) {
+        if (state.released) return false;
+        opts.releaseScale = clamp(s, 0.95, 1.05);
+        state.releaseScale = opts.releaseScale;
+        var p0 = C.curve[2];
+        var dh = (opts.releaseScale - 1) * 543;
+        var dd = dh / Math.max(0.55, p0.ty);
+        Body.setPosition(ball, {
+          x: p0.x - p0.tx * dd + p0.ty * (C.ballR - 0.5),
+          y: p0.y - p0.ty * dd - p0.tx * (C.ballR - 0.5)
+        });
+        Body.setVelocity(ball, { x: 0, y: 0 }); Body.setAngularVelocity(ball, 0);
+        C.ballStart = { x: ball.position.x, y: ball.position.y };
+        if (latch) {
+          Body.setPosition(latch, { x: ball.position.x + p0.tx * 17, y: ball.position.y + p0.ty * 17 });
+          Body.setAngle(latch, Math.atan2(p0.ty, p0.tx));
+        }
+        emit('intervention', '📏 干预：释放高度调整为基准的 ' + Math.round(opts.releaseScale * 100) + '%');
+        return true;
+      },
+      can: {
+        lockSeesaw: function () {
+          // 事件节点 = 球已释放、尚未接触跷跷板（球滚 ~2s，窗口充裕；勿再加 releaseAnim 等瞬时条件——插销动画仅 140ms，会把人类点击窗口挤没）
+          return !!(state.released && !flags.ballBeam && !state.locked);
+        },
+        insertBaffle: function () {
+          return !!(flags.gateOpen && !flags.cartDom && !state.baffleIn && !state.done);
+        }
+      },
+      recordSoundDelay: function (ms) { stats.soundDelays.push(ms); },
+      onEvent: function (fn) { listeners.push(fn); return api; },
+      reset: reset,
+      probe: function () {
+        return {
+          t: simT,
+          ball: ball ? [ball.position.x, ball.position.y] : null,
+          ballV: ball ? Math.hypot(ball.velocity.x, ball.velocity.y) : 0,
+          beamAngle: beam.angle / DEG,
+          gateY: gate.parts[1].position.y,
+          rodY: rod.position.y,
+          cartX: cart.position.x,
+          hammerAngle: hammer.angle / DEG,
+          stage: state.stage
+        };
+      }
+    };
+
+    // 挡板插入动画（在 step 中处理）
+    var _step0 = api.step;
+    api.step = function (dt) {
+      if (state.baffleAnim !== undefined && state.baffleAnim >= 0 && baffleBody) {
+        state.baffleAnim += dt;
+        var k = Math.min(1, state.baffleAnim / 200);
+        Body.setPosition(baffleBody, { x: C.baffle.x, y: C.baffle.y - 60 + 60 * k });
+        if (k >= 1) state.baffleAnim = -1;
+      }
+      _step0(dt);
+    };
+
+    reset();
+    return api;
+  }
+
+  return { createWorld: createWorld, STEP_MS: STEP_MS, STAGES: STAGES };
+});
+</script>
+<script>/*
+ * main.js — 渲染 + 音效 + UI + 日志面板
+ * 物理与因果全部在 world.js：本文件只做呈现，不干预力学。
+ * 声音只由 world 的真实事件（碰撞/机制/铃）驱动；每声记录的延迟计入诊断量。
+ */
+'use strict';
+(function () {
+  var Matter = window.Matter;
+  var MW = window.MarbleWorld;
+  var world = MW.createWorld(Matter);
+  var STEP = MW.STEP_MS;
+  var STAGES = MW.STAGES;
+
+  // ---------------------------------------------------------------- canvas & camera
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var cam = { s: 0.6, x: 0, y: 0 };           // s: px/世界px；x,y: 世界坐标在画布中心
+  var dpr = 1, cw = 0, ch = 0;
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    var r = cv.parentElement.getBoundingClientRect();
+    cw = r.width; ch = r.height;
+    cv.width = cw * dpr; cv.height = ch * dpr;
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function worldBounds() {
+    var bs = Matter.Composite.allBodies(world.engine.world);
+    var min = { x: 1e9, y: 1e9 }, max = { x: -1e9, y: -1e9 };
+    bs.forEach(function (b) {
+      min.x = Math.min(min.x, b.bounds.min.x); max.x = Math.max(max.x, b.bounds.max.x);
+      min.y = Math.min(min.y, b.bounds.min.y); max.y = Math.max(max.y, b.bounds.max.y);
+    });
+    return { min: min, max: max };
+  }
+  function fitAll() {
+    var b = worldBounds();
+    var pad = 40;
+    var s = Math.min((cw - pad * 2) / (b.max.x - b.min.x), (ch - pad * 2) / (b.max.y - b.min.y));
+    cam.s = s;
+    cam.x = (b.min.x + b.max.x) / 2;
+    cam.y = (b.min.y + b.max.y) / 2;
+  }
+  var VIEWS = {
+    all: null,
+    ramp: { x: 400, y: 570, s: 1.35 },
+    gate: { x: 790, y: 600, s: 2.2 },
+    track: { x: 900, y: 675, s: 2.0 },
+    domino: { x: 1120, y: 660, s: 1.9 },
+    bell: { x: 1410, y: 610, s: 2.0 }
+  };
+  function setView(name) {
+    var v = VIEWS[name];
+    if (!v) { fitAll(); return; }
+    cam.x = v.x; cam.y = v.y; cam.s = v.s;
+  }
+  function worldToScreen(p) { return { x: (p.x - cam.x) * cam.s + cw / 2, y: (p.y - cam.y) * cam.s + ch / 2 }; }
+  function screenToWorld(p) { return { x: (p.x - cw / 2) / cam.s + cam.x, y: (p.y - ch / 2) / cam.s + cam.y }; }
+
+  // wheel zoom around cursor
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var before = screenToWorld({ x: e.offsetX, y: e.offsetY });
+    cam.s *= Math.exp(-e.deltaY * 0.0012);
+    cam.s = Math.max(0.15, Math.min(8, cam.s));
+    var after = screenToWorld({ x: e.offsetX, y: e.offsetY });
+    cam.x += before.x - after.x; cam.y += before.y - after.y;
+  }, { passive: false });
+  // drag pan
+  var drag = null;
+  cv.addEventListener('mousedown', function (e) { drag = { x: e.clientX, y: e.clientY }; cv.classList.add('dragging'); });
+  window.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    cam.x -= (e.clientX - drag.x) / cam.s; cam.y -= (e.clientY - drag.y) / cam.s;
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener('mouseup', function () { drag = null; cv.classList.remove('dragging'); });
+  document.querySelectorAll('#views .viewbtn').forEach(function (b) {
+    b.addEventListener('click', function () { setView(b.dataset.v); });
+  });
+
+  // ---------------------------------------------------------------- audio（只由真实事件驱动）
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var actx = null;
+  function audio() {
+    if (!actx) { try { actx = new AC(); } catch (e) { return null; } }
+    if (actx.state === 'suspended') { actx.resume(); return null; } // 首次手势解锁，本声放弃
+    return actx;
+  }
+  function noiseBuffer(a, dur) {
+    var buf = a.createBuffer(1, a.sampleRate * dur, a.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+  // 铃：非谐波分音列（敲击金属的特征频谱），指数衰减
+  function playBell(vol, when) {
+    var a = audio(); if (!a) return false;
+    var f0 = 987.77; // B5
+    var partials = [[1, 1], [2.01, 0.55], [2.74, 0.4], [5.43, 0.22], [8.21, 0.1]];
+    partials.forEach(function (p) {
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = f0 * p[0] * (1 + (Math.random() - 0.5) * 0.004);
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(0.35 * vol * p[1], when + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + 2.6 - p[1]);
+      o.connect(g); g.connect(a.destination);
+      o.start(when); o.stop(when + 2.8);
+    });
+    return true;
+  }
+  function playThud(vol, pitch, when) {
+    var a = audio(); if (!a) return false;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(pitch, when);
+    o.frequency.exponentialRampToValueAtTime(Math.max(40, pitch * 0.4), when + 0.09);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.25 * vol, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
+    o.connect(g); g.connect(a.destination);
+    o.start(when); o.stop(when + 0.16);
+    var n = a.createBufferSource(), ng = a.createGain(), f = a.createBiquadFilter();
+    n.buffer = noiseBuffer(a, 0.1);
+    f.type = 'bandpass'; f.frequency.value = 900 + pitch * 3; f.Q.value = 1.2;
+    ng.gain.setValueAtTime(0.0001, when);
+    ng.gain.exponentialRampToValueAtTime(0.18 * vol, when + 0.003);
+    ng.gain.exponentialRampToValueAtTime(0.0001, when + 0.09);
+    n.connect(f); f.connect(ng); ng.connect(a.destination);
+    n.start(when);
+    return true;
+  }
+  function playClick(when, freq) {
+    var a = audio(); if (!a) return false;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.12, when + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+    o.connect(g); g.connect(a.destination);
+    o.start(when); o.stop(when + 0.06);
+    return true;
+  }
+
+  // ---------------------------------------------------------------- 事件 → 声音/特效/日志
+  var fx = { bell: 0, sign: -1, signT: 1, flash: {} };
+  var lastThud = 0;
+  function onEvent(e) {
+    // 日志
+    logAdd(e);
+    // 声音：全部只在真实事件上触发；延迟 = 事件产生到声音开响的墙钟差
+    var now = performance.now();
+    var played = false;
+    if (e.kind === 'bell') { played = playBell(1, actx ? actx.currentTime : 0); fx.bell = 1; }
+    else if (e.kind === 'sign') { played = playClick(actx ? actx.currentTime : 0, 660); fx.sign = -fx.sign; fx.signT = 0; }
+    else if (e.kind === 'collision') {
+      if (now - lastThud > 45) { // 限频，避免多米诺连倒时爆音
+        var depthM = e.msg.match(/深度 ([\d.]+)/);
+        var v = Math.min(1, (depthM ? parseFloat(depthM[1]) : 0.4) / 1.2);
+        played = playThud(0.35 + 0.65 * v, 140 + 220 * v, actx ? actx.currentTime : 0);
+        lastThud = now;
+      }
+    }
+    else if (e.kind === 'mechanism') {
+      if (/闸门升起到位|锁定高位/.test(e.msg)) played = playThud(0.8, 90, actx ? actx.currentTime : 0);
+      else if (/锁扣脱开|门闩撤除|止动销撤除/.test(e.msg)) played = playClick(actx ? actx.currentTime : 0, 300);
+    }
+    else if (e.kind === 'op') played = playClick(actx ? actx.currentTime : 0, 520);
+    if (played) world.recordSoundDelay(performance.now() - e.wall);
+    // 环节 chips
+    if (e.kind === 'state') refreshChips(e.stage);
+  }
+  world.onEvent(onEvent);
+
+  // ---------------------------------------------------------------- 日志面板
+  var logEl = document.getElementById('log');
+  var filtersEl = document.getElementById('logfilters');
+  var KINDS = [['state', '环节'], ['mechanism', '机构'], ['collision', '碰撞'], ['intervention', '干预'], ['op', '操作'], ['diag', '诊断'], ['bell', '铃'], ['sign', '指示牌']];
+  var showKinds = {};
+  KINDS.forEach(function (k) { showKinds[k[0]] = true; });
+  KINDS.forEach(function (k) {
+    var c = document.createElement('span');
+    c.className = 'fchip on'; c.textContent = k[1]; c.dataset.k = k[0];
+    c.addEventListener('click', function () {
+      showKinds[k[0]] = !showKinds[k[0]];
+      c.classList.toggle('on', showKinds[k[0]]);
+      refreshLog();
+    });
+    filtersEl.appendChild(c);
+  });
+  var MAXROWS = 400;
+  function logAdd(e) {
+    if (!showKinds[e.kind]) return;
+    var row = document.createElement('div');
+    row.className = 'row';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = (e.t / 1000).toFixed(2) + 's';
+    var k = document.createElement('span'); k.className = 'k k-' + e.kind; k.textContent = (KINDS.find(function (x) { return x[0] === e.kind; }) || ['', e.kind])[1];
+    var m = document.createElement('span'); m.className = 'm'; m.textContent = e.msg;
+    row.appendChild(t); row.appendChild(k); row.appendChild(m);
+    logEl.appendChild(row);
+    while (logEl.children.length > MAXROWS) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function refreshLog() {
+    logEl.innerHTML = '';
+    world.log.forEach(logAdd);
+  }
+  document.getElementById('btnExport').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify({ log: world.log, stats: world.stats, stages: STAGES }, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'marble-chain-log.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // ---------------------------------------------------------------- 控制
+  var paused = false;
+  var btnRelease = document.getElementById('btnRelease');
+  var btnPause = document.getElementById('btnPause');
+  var btnLock = document.getElementById('btnLock');
+  var btnBaffle = document.getElementById('btnBaffle');
+  var btnGravity = document.getElementById('btnGravity');
+  var heightVal = document.getElementById('heightVal');
+
+  btnRelease.addEventListener('click', function () { audio(); world.release(); });
+  btnPause.addEventListener('click', togglePause);
+  function togglePause() {
+    paused = !paused;
+    btnPause.textContent = paused ? '继续 (空格)' : '暂停 (空格)';
+  }
+  document.getElementById('btnReset').addEventListener('click', resetAll);
+  btnLock.addEventListener('click', function () { world.lockSeesaw(); });
+  btnBaffle.addEventListener('click', function () { world.insertBaffle(); });
+  btnGravity.addEventListener('click', function () {
+    var g = world.state.gravityScale === 1 ? 0.5 : 1;
+    world.setGravity(g);
+    btnGravity.textContent = '⚖️ 重力 ×' + g + ' (G)';
+  });
+  function bumpHeight(d) {
+    if (world.state.released) return;
+    var s = Math.round((world.state.releaseScale + d) * 100) / 100;
+    if (world.setReleaseScale(s)) {
+      heightVal.textContent = Math.round(s * 100) + '%';
+    }
+  }
+  document.getElementById('btnHminus').addEventListener('click', function () { bumpHeight(-0.05); });
+  document.getElementById('btnHplus').addEventListener('click', function () { bumpHeight(0.05); });
+
+  window.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case ' ': e.preventDefault(); togglePause(); break;
+      case 'r': case 'R': audio(); world.release(); break;
+      case 'l': case 'L': world.lockSeesaw(); break;
+      case 'b': case 'B': world.insertBaffle(); break;
+      case 'g': case 'G': btnGravity.click(); break;
+      case '[': bumpHeight(-0.05); break;
+      case ']': bumpHeight(0.05); break;
+    }
+  });
+
+  function resetAll() {
+    world.reset();
+    paused = false;
+    btnPause.textContent = '暂停 (空格)';
+    btnGravity.textContent = '⚖️ 重力 ×1 (G)';
+    heightVal.textContent = Math.round(world.state.releaseScale * 100) + '%';
+    fx.bell = 0; fx.sign = -1; fx.signT = 1;
+    refreshChips(0);
+    refreshLog();
+    fitAll();
+  }
+
+  // ---------------------------------------------------------------- 环节 chips & 统计条
+  var chipsEl = document.getElementById('stages');
+  var chips = STAGES.map(function (s, i) {
+    var c = document.createElement('span');
+    c.className = 'chip'; c.textContent = i + ' ' + s;
+    chipsEl.appendChild(c);
+    return c;
+  });
+  function refreshChips(stage) {
+    chips.forEach(function (c, i) {
+      c.classList.toggle('active', i === stage);
+      c.classList.toggle('done', i < stage);
+    });
+  }
+  refreshChips(0);
+
+  var stStop = document.getElementById('stStop');
+  var stAcausal = document.getElementById('stAcausal');
+  var stSnd = document.getElementById('stSnd');
+  var stCol = document.getElementById('stCol');
+  var stTime = document.getElementById('stTime');
+  function refreshStats() {
+    var st = world.state, stats = world.stats;
+    stStop.textContent = st.done ? (stats.stopReason || STAGES[st.stage]) : STAGES[st.stage];
+    stAcausal.textContent = stats.acausal;
+    stCol.textContent = stats.collisions;
+    stTime.textContent = (st.t / 1000).toFixed(1) + 's';
+    if (stats.soundDelays.length) {
+      var mx = 0, sum = 0;
+      stats.soundDelays.forEach(function (d) { mx = Math.max(mx, d); sum += d; });
+      stSnd.textContent = (sum / stats.soundDelays.length).toFixed(1) + '/' + mx.toFixed(1) + 'ms';
+    } else stSnd.textContent = '—';
+    // 干预按钮武装态
+    var canLock = world.can.lockSeesaw();
+    btnLock.disabled = !canLock && !st.locked;
+    btnLock.classList.toggle('armed', canLock);
+    if (st.locked) { btnLock.textContent = '🔒 已锁定'; }
+    var canBaffle = world.can.insertBaffle();
+    btnBaffle.disabled = !canBaffle && !st.baffleIn;
+    btnBaffle.classList.toggle('armed', canBaffle);
+    if (st.baffleIn) { btnBaffle.textContent = '🧱 挡板已插入'; }
+    btnRelease.disabled = st.released;
+    var hOn = !st.released;
+    document.getElementById('btnHminus').disabled = !hOn || world.state.releaseScale <= 0.95;
+    document.getElementById('btnHplus').disabled = !hOn || world.state.releaseScale >= 1.05;
+  }
+
+  // ---------------------------------------------------------------- 渲染
+  function shade(hex, f) { // 简易明暗
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.min(255, Math.max(0, ((n >> 16) & 255) * f)) | 0;
+    var g = Math.min(255, Math.max(0, ((n >> 8) & 255) * f)) | 0;
+    var b = Math.min(255, Math.max(0, (n & 255) * f)) | 0;
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  var MAT = {
+    ball: { fill: '#e05252', stroke: '#ffd0d0' },
+    beam: { fill: '#b98a4a', stroke: '#e8c88a' },
+    gate: { fill: '#d4af37', stroke: '#f4e2a0' },
+    track: { fill: '#8a6a3f', stroke: '#c8a86a' },
+    shelf: { fill: '#7a5c38', stroke: '#b09055' },
+    cart: { fill: '#7f9db9', stroke: '#c0d4e8' },
+    domino: { fill: '#f2ead8', stroke: '#c8b890' },
+    tower: { fill: '#e8dcc0', stroke: '#c0a860' },
+    hammer: { fill: '#c9a227', stroke: '#f0d878' },
+    bell: { fill: '#ffd75e', stroke: '#fff0b0' },
+    steel: { fill: '#5a6a80', stroke: '#8a9ab0' },
+    wood: { fill: '#6a4f30', stroke: '#9a7a50' }
+  };
+  function matOf(b) {
+    var l = b.label || '';
+    if (l === 'ball') return MAT.ball;
+    if (l === 'beam' || l.indexOf('beam') === 0) return MAT.beam;
+    if (l === 'gate') return MAT.gate;
+    if (l.indexOf('track') === 0 || l === 'ramp') return MAT.track;
+    if (l === 'shelf') return MAT.shelf;
+    if (l === 'cart') return MAT.cart;
+    if (l.indexOf('domino#') === 0) return MAT.domino;
+    if (l === 'tower') return MAT.tower;
+    if (l === 'hammer') return MAT.hammer;
+    if (l === 'bell') return MAT.bell;
+    if (l === 'bumper' || l === 'hammerStop') return MAT.wood;
+    return MAT.steel;
+  }
+  function trace(verts) {
+    ctx.beginPath();
+    ctx.moveTo(verts[0].x, verts[0].y);
+    for (var i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+    ctx.closePath();
+  }
+  function drawBody(b) {
+    var mat = matOf(b);
+    var parts = b.parts && b.parts.length > 1 ? b.parts.slice(1) : [b];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      trace(p.vertices);
+      ctx.fillStyle = mat.fill;
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, 1.2 / cam.s * 2);
+      ctx.strokeStyle = mat.stroke;
+      ctx.stroke();
+    }
+    // 骨牌点数 & 高塔纹
+    if (b.label && b.label.indexOf('domino#') === 0) {
+      ctx.fillStyle = '#a03838';
+      ctx.beginPath(); ctx.arc(b.position.x, b.position.y - 10, 2.2, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.position.x, b.position.y + 8, 2.2, 0, 7); ctx.fill();
+    }
+    if (b.label === 'tower') {
+      ctx.strokeStyle = '#a03838'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(b.position.x - 5, b.position.y - 20); ctx.lineTo(b.position.x + 5, b.position.y - 20);
+      ctx.moveTo(b.position.x - 5, b.position.y); ctx.lineTo(b.position.x + 5, b.position.y);
+      ctx.stroke();
+    }
+  }
+
+  var STATION_LABELS = [
+    [180, 470, '① 曲坡道'], [520, 790, '② 跷跷板'], [782, 470, '③ 套筒闸门'],
+    [900, 740, '④ 无摩擦滑车'], [1100, 600, '⑤ 多米诺连锁'], [1420, 520, '⑥ 敲铃 · 指示牌']
+  ];
+  function drawScene() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // 背景：深夜实验室
+    var g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, '#0d1220'); g.addColorStop(1, '#131a26');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+    // 网格
+    ctx.strokeStyle = 'rgba(80,100,140,0.07)'; ctx.lineWidth = 1;
+    var step = 40 * cam.s;
+    if (step > 12) {
+      var ox = (cw / 2 - cam.x * cam.s) % step, oy = (ch / 2 - cam.y * cam.s) % step;
+      ctx.beginPath();
+      for (var x = ox; x < cw; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, ch); }
+      for (var y = oy; y < ch; y += step) { ctx.moveTo(0, y); ctx.lineTo(cw, y); }
+      ctx.stroke();
+    }
+    // 世界
+    ctx.save();
+    ctx.translate(cw / 2, ch / 2);
+    ctx.scale(cam.s, cam.s);
+    ctx.translate(-cam.x, -cam.y);
+
+    // 地板
+    ctx.fillStyle = '#1a2030';
+    ctx.fillRect(60, 762, 1650, 60);
+    ctx.strokeStyle = '#2a3550'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(60, 762); ctx.lineTo(1710, 762); ctx.stroke();
+
+    var bs = Matter.Composite.allBodies(world.engine.world);
+    bs.forEach(function (b) { if (b.parent === b) drawBody(b); });
+
+    // 铃的摇晃（真实敲响后的视觉余韵）
+    if (fx.bell > 0.01) {
+      var bell = world.bodies.bell;
+      if (bell) {
+        var mount = { x: world.C.bell.x, y: world.C.bell.y - world.C.bell.r - 8 };
+        ctx.save();
+        ctx.translate(mount.x, mount.y);
+        ctx.rotate(Math.sin(performance.now() * 0.02) * 0.16 * fx.bell);
+        ctx.translate(-mount.x, -mount.y);
+        ctx.globalAlpha = 0.5;
+        drawBody(bell);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+    // 指示牌（营业/下班 翻面）
+    var sx = 1560, sy = 700;
+    ctx.fillStyle = '#3a3020'; ctx.fillRect(sx - 8, sy, 96, 66);
+    ctx.fillStyle = '#241c10'; ctx.fillRect(sx - 2, sy - 6, 84, 8);
+    var flip = fx.signT < 1 ? Math.cos(Math.min(1, fx.signT) * Math.PI) : (fx.sign > 0 ? -1 : 1);
+    // sign=+1 → 下班；flip 控制水平压缩做翻面动画
+    var w1 = 76, squish = Math.max(0.06, Math.abs(flip));
+    ctx.save();
+    ctx.translate(sx + w1 / 2, sy + 32);
+    ctx.scale(squish, 1);
+    var face = flip >= 0 ? '#f5eedc' : '#e8f0e8';
+    if (fx.signT < 1 && flip < 0) face = '#e8f0e8';
+    ctx.fillStyle = face;
+    ctx.fillRect(-w1 / 2, -24, w1, 48);
+    ctx.fillStyle = fx.sign > 0 ? '#1a7a3a' : '#b03030';
+    ctx.font = 'bold 24px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(fx.sign > 0 ? '下班' : '营业', 0, 1);
+    ctx.restore();
+
+    // 站点标签
+    if (cam.s > 0.45) {
+      ctx.font = '13px "PingFang SC", sans-serif';
+      ctx.textAlign = 'center';
+      STATION_LABELS.forEach(function (s) {
+        ctx.fillStyle = 'rgba(160,175,200,0.75)';
+        ctx.fillText(s[2], s[0], s[1]);
+      });
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- 主循环
+  // 注意：用 setInterval 而非 rAF 驱动——嵌入式/无头 webview 常把 rAF 整体节流，
+  // 物理步进必须可靠；fixed-step 累加器与渲染解耦，60Hz 定时器即可
+  var acc = 0, lastT = performance.now();
+  function frame(now) {
+    var dt = Math.min(100, now - lastT); lastT = now;
+    if (!paused) {
+      acc += dt;
+      while (acc >= STEP) { world.step(STEP); acc -= STEP; }
+    }
+    fx.bell *= 0.985;
+    if (fx.signT < 1) fx.signT = Math.min(1, fx.signT + dt / 600);
+    drawScene();
+    refreshStats();
+  }
+  setInterval(function () { frame(performance.now()); }, 1000 / 60);
+  fitAll();
+  refreshLog();
+  frame(performance.now());
+})();
+</script>
+</body>
+</html>

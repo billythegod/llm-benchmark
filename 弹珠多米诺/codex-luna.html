@@ -1,0 +1,1531 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101315" />
+    <title>一颗弹珠，让整间实验室下班</title>
+    <style>
+:root {
+  color-scheme: dark;
+  --bg: #101315;
+  --bg-soft: #171b1c;
+  --panel: #1b2020;
+  --panel-raised: #212727;
+  --line: #343b39;
+  --line-soft: #29302e;
+  --ink: #e8e5dc;
+  --muted: #98a09b;
+  --faint: #66706a;
+  --paper: #d9d2c2;
+  --machine: #9fa79f;
+  --orange: #ee8b48;
+  --orange-bright: #ffad65;
+  --green: #99c79d;
+  --red: #e88472;
+  --blue: #8bb8c3;
+  --radius: 14px;
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+  font-family: "Avenir Next", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+
+html { min-width: 320px; background: var(--bg); }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 6%, rgba(238, 139, 72, 0.07), transparent 28rem),
+    radial-gradient(circle at 86% 18%, rgba(153, 199, 157, 0.055), transparent 26rem),
+    var(--bg);
+}
+
+button, input { font: inherit; }
+button { color: inherit; }
+
+.app-shell { width: min(1680px, 100%); margin: 0 auto; padding: 0 28px 18px; }
+
+.topbar {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-soft);
+  gap: 24px;
+}
+
+.brand-lockup { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand-mark { width: 26px; height: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-items: end; flex: 0 0 auto; }
+.brand-mark span { display: block; border: 1px solid var(--orange); background: rgba(238, 139, 72, 0.16); }
+.brand-mark span:nth-child(1) { height: 12px; }
+.brand-mark span:nth-child(2) { height: 22px; }
+.brand-mark span:nth-child(3) { height: 30px; background: rgba(238, 139, 72, 0.3); }
+
+.eyebrow {
+  color: var(--faint);
+  font-family: "SF Mono", "Roboto Mono", ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+h1, h2, p { margin: 0; }
+h1 { max-width: 30rem; margin-top: 5px; font-size: clamp(18px, 2vw, 24px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+h2 { margin-top: 4px; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+
+.topbar-status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.status-led { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 4px rgba(102,112,106,.12); }
+.status-led.is-running { background: var(--orange); box-shadow: 0 0 0 4px rgba(238,139,72,.12); }
+.status-led.is-done { background: var(--green); box-shadow: 0 0 0 4px rgba(153,199,157,.12); }
+.status-led.is-halted { background: var(--red); box-shadow: 0 0 0 4px rgba(232,132,114,.12); }
+
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 385px; gap: 20px; padding-top: 20px; align-items: start; }
+.stage-column { min-width: 0; }
+.stage-card, .panel { background: linear-gradient(145deg, rgba(33,39,39,.96), rgba(24,29,29,.96)); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+.stage-card { overflow: hidden; }
+.stage-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 20px 22px 16px; }
+.stage-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.button { min-height: 34px; border: 1px solid transparent; border-radius: 9px; padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; transition: transform .18s ease, border-color .18s ease, background .18s ease, color .18s ease, opacity .18s ease; white-space: nowrap; }
+.button:hover:not(:disabled) { transform: translateY(-1px); }
+.button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+.button:focus-visible, .text-button:focus-visible, .intervention-row:focus-visible, input:focus-visible { outline: 2px solid var(--orange-bright); outline-offset: 3px; }
+.button:disabled { cursor: not-allowed; opacity: .42; }
+.button-quiet { background: transparent; border-color: var(--line); color: var(--muted); }
+.button-quiet:hover:not(:disabled) { border-color: var(--orange); color: var(--ink); background: rgba(238,139,72,.08); }
+.button-primary { background: var(--orange); color: #27170c; border-color: var(--orange); box-shadow: 0 8px 18px rgba(238,139,72,.18); }
+.button-primary:hover:not(:disabled) { background: var(--orange-bright); border-color: var(--orange-bright); }
+.button-secondary { background: rgba(255,255,255,.035); border-color: var(--line); color: var(--ink); }
+.button-secondary:hover:not(:disabled) { border-color: var(--machine); }
+
+.canvas-shell { position: relative; min-height: 490px; height: clamp(490px, 49vw, 720px); margin: 0 10px; overflow: hidden; border: 1px solid #303735; border-radius: 10px; background: #111617; }
+#scene { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.canvas-corner { position: absolute; top: 13px; color: rgba(232,229,220,.5); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; letter-spacing: .14em; pointer-events: none; }
+.canvas-corner-left { left: 15px; }
+.canvas-corner-right { right: 15px; }
+.canvas-freeze { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color: var(--paper); background: rgba(16,19,21,.24); backdrop-filter: blur(1.5px); pointer-events: none; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: .12em; }
+.freeze-icon { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--orange); border-radius: 50%; color: var(--orange-bright); font-size: 17px; }
+
+.stage-foot { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 14px 22px 17px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legend-swatch { display: inline-block; width: 15px; height: 3px; border-radius: 999px; }
+.legend-swatch-contact { background: var(--orange); }
+.legend-swatch-constraint { background: var(--blue); }
+.legend-swatch-state { background: var(--green); }
+.zoom-control { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.zoom-control input { width: 112px; }
+.zoom-control span:last-child { min-width: 34px; color: var(--ink); font-family: "SF Mono", ui-monospace, monospace; }
+
+input[type="range"] { appearance: none; height: 3px; border-radius: 99px; background: #3d4642; accent-color: var(--orange); cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { appearance: none; width: 13px; height: 13px; border: 2px solid var(--orange-bright); border-radius: 50%; background: var(--panel); box-shadow: 0 0 0 3px rgba(238,139,72,.14); }
+input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border: 2px solid var(--orange-bright); border-radius: 50%; background: var(--panel); }
+
+.chain-strip { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 13px 9px 0; overflow-x: auto; }
+.chain-node { min-width: 76px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 7px; border: 1px solid var(--line-soft); border-radius: 8px; color: var(--faint); background: rgba(255,255,255,.018); font-size: 11px; transition: color .2s ease, border-color .2s ease, background .2s ease, transform .2s ease; }
+.chain-node.is-current { color: var(--orange-bright); border-color: rgba(238,139,72,.7); background: rgba(238,139,72,.09); transform: translateY(-2px); }
+.chain-node.is-passed { color: var(--green); border-color: rgba(153,199,157,.34); }
+.chain-node.is-halted { color: var(--red); border-color: rgba(232,132,114,.45); background: rgba(232,132,114,.06); }
+.node-index { font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; color: var(--faint); }
+.chain-arrow { color: var(--faint); font-size: 18px; line-height: 1; }
+
+.control-column { display: flex; flex-direction: column; gap: 12px; }
+.panel { padding: 18px; }
+.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.compact-heading { align-items: center; }
+.run-state { color: var(--orange); font-family: "SF Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .12em; }
+.primary-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; margin-top: 17px; }
+.run-note { margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+.intervention-list { display: grid; gap: 8px; margin-top: 15px; }
+.intervention-row { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px 10px; border: 1px solid var(--line-soft); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.018); text-align: left; cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease, opacity .18s ease; }
+.intervention-row:hover:not(:disabled) { border-color: rgba(238,139,72,.58); background: rgba(238,139,72,.06); transform: translateY(-1px); }
+.intervention-row:active:not(:disabled) { transform: translateY(1px); }
+.intervention-row:disabled { opacity: .46; cursor: not-allowed; }
+.intervention-row.is-armed { border-color: rgba(238,139,72,.72); background: rgba(238,139,72,.085); }
+.intervention-row.is-triggered { border-color: rgba(153,199,157,.45); background: rgba(153,199,157,.06); }
+.intervention-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-family: "SF Mono", ui-monospace, monospace; font-size: 10px; }
+.is-armed .intervention-icon { color: var(--orange-bright); border-color: rgba(238,139,72,.65); }
+.is-triggered .intervention-icon { color: var(--green); border-color: rgba(153,199,157,.5); }
+.intervention-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.intervention-copy strong { font-size: 12px; font-weight: 600; }
+.intervention-copy small { color: var(--muted); font-size: 10px; line-height: 1.35; }
+.intervention-state { color: var(--faint); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; white-space: nowrap; }
+.is-armed .intervention-state { color: var(--orange-bright); }
+.is-triggered .intervention-state { color: var(--green); }
+
+.parameter-panel { display: grid; gap: 15px; }
+.parameter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.parameter-label { display: flex; flex-direction: column; gap: 4px; }
+.parameter-label strong { font-size: 12px; font-weight: 600; }
+.parameter-label small { color: var(--muted); font-size: 10px; }
+.segmented-control { display: grid; grid-template-columns: 1fr 1fr; min-width: 94px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: #141818; cursor: pointer; }
+.segmented-control span { padding: 6px 8px; color: var(--muted); font-family: "SF Mono", ui-monospace, monospace; font-size: 10px; }
+.segmented-control span:first-child { border-radius: 6px; color: var(--ink); background: var(--panel-raised); }
+.segmented-control.is-half span:first-child { color: var(--muted); background: transparent; }
+.segmented-control.is-half span:last-child { border-radius: 6px; color: #2a1a0f; background: var(--orange); }
+.height-control { display: flex; align-items: center; gap: 8px; }
+.height-control input { width: 102px; }
+.height-control span { min-width: 34px; color: var(--orange-bright); font-family: "SF Mono", ui-monospace, monospace; font-size: 10px; text-align: right; }
+
+.text-button { border: 0; padding: 2px 0; color: var(--orange-bright); background: transparent; font-family: "SF Mono", ui-monospace, monospace; font-size: 10px; cursor: pointer; }
+.text-button:hover { color: var(--ink); }
+.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 15px; }
+.metric { min-height: 57px; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; padding: 10px; border: 1px solid var(--line-soft); border-radius: 9px; background: rgba(255,255,255,.02); }
+.metric span { color: var(--muted); font-size: 10px; }
+.metric strong { overflow: hidden; color: var(--ink); font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.outcome-banner { display: flex; align-items: center; gap: 8px; min-height: 35px; margin-top: 10px; padding: 0 10px; border: 1px solid var(--line-soft); border-radius: 8px; color: var(--muted); font-size: 11px; }
+.outcome-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.outcome-banner.is-success { color: var(--green); border-color: rgba(153,199,157,.36); background: rgba(153,199,157,.06); }
+.outcome-banner.is-success .outcome-dot { background: var(--green); }
+.outcome-banner.is-halted { color: var(--red); border-color: rgba(232,132,114,.36); background: rgba(232,132,114,.06); }
+.outcome-banner.is-halted .outcome-dot { background: var(--red); }
+.log-wrap { margin-top: 15px; border-top: 1px solid var(--line-soft); }
+.log-head { display: flex; justify-content: space-between; padding: 11px 0 8px; color: var(--faint); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; letter-spacing: .06em; }
+.event-log { max-height: 225px; overflow: auto; padding-right: 3px; }
+.log-empty { padding: 12px 0 6px; color: var(--faint); font-size: 10px; line-height: 1.5; }
+.log-row { display: grid; grid-template-columns: 43px minmax(0, 1fr); gap: 9px; padding: 8px 0; border-top: 1px solid rgba(52,59,57,.55); }
+.log-time { color: var(--faint); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; }
+.log-main { min-width: 0; }
+.log-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 10px; }
+.log-title strong { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.log-badge { flex: 0 0 auto; padding: 2px 4px; border: 1px solid rgba(238,139,72,.5); border-radius: 4px; color: var(--orange-bright); font-family: "SF Mono", ui-monospace, monospace; font-size: 8px; }
+.log-badge.constraint { color: var(--blue); border-color: rgba(139,184,195,.45); }
+.log-badge.state { color: var(--green); border-color: rgba(153,199,157,.45); }
+.log-detail { margin-top: 3px; color: var(--muted); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; line-height: 1.45; }
+
+.footer-note { display: flex; justify-content: space-between; gap: 20px; padding: 14px 2px 0; color: var(--faint); font-family: "SF Mono", ui-monospace, monospace; font-size: 9px; line-height: 1.45; }
+
+@media (max-width: 1120px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) 340px; }
+  .canvas-shell { height: clamp(470px, 57vw, 620px); }
+  .chain-node { min-width: 69px; }
+}
+
+@media (max-width: 900px) {
+  .app-shell { padding: 0 16px 16px; }
+  .workspace { grid-template-columns: 1fr; }
+  .control-column { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .run-panel, .diagnostics-panel { grid-column: span 2; }
+  .canvas-shell { height: min(67vw, 620px); min-height: 420px; }
+}
+
+@media (max-width: 620px) {
+  .topbar { min-height: 70px; }
+  .topbar-status { font-size: 10px; }
+  .stage-head { display: block; padding: 16px 16px 12px; }
+  .stage-actions { justify-content: flex-start; margin-top: 12px; }
+  .canvas-shell { min-height: 330px; height: 70vw; margin: 0 6px; }
+  .stage-foot { display: block; padding: 11px 16px 14px; }
+  .zoom-control { margin-top: 12px; }
+  .zoom-control input { width: min(45vw, 180px); }
+  .chain-strip { justify-content: flex-start; padding-top: 9px; }
+  .chain-node { min-width: 67px; }
+  .control-column { display: flex; }
+  .panel { padding: 15px; }
+  .footer-note { display: block; }
+  .footer-note span { display: block; }
+  .footer-note span + span { margin-top: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+</style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <div class="eyebrow">MECHANICAL CHAIN / 01</div>
+            <h1>一颗弹珠，让整间实验室下班</h1>
+          </div>
+        </div>
+        <div class="topbar-status">
+          <span class="status-led" id="status-led"></span>
+          <span id="top-status">待释放</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="stage-column" aria-label="机械装置主视图">
+          <div class="stage-card">
+            <div class="stage-head">
+              <div>
+                <div class="eyebrow">全链路剖面</div>
+                <h2>把因果关系放在桌面上</h2>
+              </div>
+              <div class="stage-actions">
+                <button class="button button-quiet" id="focus-overview" type="button">全景</button>
+                <button class="button button-quiet" id="focus-bell" type="button">看铃</button>
+                <button class="button button-quiet" id="focus-seesaw" type="button">看跷跷板</button>
+              </div>
+            </div>
+
+            <div class="canvas-shell" id="canvas-shell">
+              <canvas id="scene" aria-label="可交互机械连锁装置"></canvas>
+              <div class="canvas-corner canvas-corner-left">PHYSICAL CONTACT VIEW</div>
+              <div class="canvas-corner canvas-corner-right" id="canvas-mode">OVERVIEW / 1.00x</div>
+              <div class="canvas-freeze" id="canvas-freeze" hidden>
+                <span class="freeze-icon">Ⅱ</span>
+                <span>物理已暂停</span>
+              </div>
+            </div>
+
+            <div class="stage-foot">
+              <div class="legend">
+                <span><i class="legend-swatch legend-swatch-contact"></i>真实接触</span>
+                <span><i class="legend-swatch legend-swatch-constraint"></i>约束 / 阻挡</span>
+                <span><i class="legend-swatch legend-swatch-state"></i>状态变化</span>
+              </div>
+              <label class="zoom-control" for="zoom-range">
+                <span>镜头</span>
+                <input id="zoom-range" type="range" min="0.72" max="1.7" step="0.01" value="1" />
+                <span id="zoom-value">1.00x</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="chain-strip" aria-label="因果链节点">
+            <div class="chain-node" data-node="release"><span class="node-index">01</span><span>释放</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="ramp"><span class="node-index">02</span><span>滚动</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="seesaw"><span class="node-index">03</span><span>跷跷板</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="gate"><span class="node-index">04</span><span>闸门</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="cart"><span class="node-index">05</span><span>小车</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="domino"><span class="node-index">06</span><span>多米诺</span></div>
+            <span class="chain-arrow">›</span>
+            <div class="chain-node" data-node="bell"><span class="node-index">07</span><span>铃 / 下班</span></div>
+          </div>
+        </section>
+
+        <aside class="control-column">
+          <section class="panel run-panel">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">现场操作</div>
+                <h2>只给第一颗球一个动作</h2>
+              </div>
+              <span class="run-state" id="run-state">READY</span>
+            </div>
+            <div class="primary-actions">
+              <button class="button button-primary" id="release-button" type="button">释放第一颗球</button>
+              <button class="button button-secondary" id="pause-button" type="button" disabled>暂停</button>
+              <button class="button button-secondary" id="reset-button" type="button">重置</button>
+            </div>
+            <div class="run-note" id="run-note">释放后，所有后续动作只能由上一个环节的接触推动。</div>
+          </section>
+
+          <section class="panel intervention-panel">
+            <div class="panel-heading compact-heading">
+              <div>
+                <div class="eyebrow">节点干预</div>
+                <h2>在事件到达前预置</h2>
+              </div>
+            </div>
+            <div class="intervention-list">
+              <button class="intervention-row" id="lock-seesaw-button" type="button">
+                <span class="intervention-icon icon-lock" aria-hidden="true">L</span>
+                <span class="intervention-copy"><strong>锁住跷跷板</strong><small>在第一颗球抵达前生效</small></span>
+                <span class="intervention-state" id="lock-state">未预置</span>
+              </button>
+              <button class="intervention-row" id="block-cart-button" type="button">
+                <span class="intervention-icon icon-block" aria-hidden="true">B</span>
+                <span class="intervention-copy"><strong>插入小车挡板</strong><small>在小车进入多米诺区前生效</small></span>
+                <span class="intervention-state" id="block-state">未预置</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="panel parameter-panel">
+            <div class="panel-heading compact-heading">
+              <div>
+                <div class="eyebrow">初始条件</div>
+                <h2>改参数，不改因果</h2>
+              </div>
+            </div>
+            <div class="parameter-row">
+              <div class="parameter-label"><strong>重力</strong><small>作用于所有自由运动部件</small></div>
+              <button class="segmented-control" id="gravity-button" type="button" aria-pressed="false"><span>1g</span><span>0.5g</span></button>
+            </div>
+            <div class="parameter-row height-row">
+              <div class="parameter-label"><strong>释放高度</strong><small>只能在原值 ±5% 内调整</small></div>
+              <div class="height-control">
+                <input id="height-range" type="range" min="95" max="105" step="1" value="100" />
+                <span id="height-value">100%</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel diagnostics-panel">
+            <div class="panel-heading compact-heading">
+              <div>
+                <div class="eyebrow">可追溯诊断</div>
+                <h2>这次停在哪里</h2>
+              </div>
+              <button class="text-button" id="export-log-button" type="button">导出日志</button>
+            </div>
+            <div class="metric-grid">
+              <div class="metric"><span>当前节点</span><strong id="metric-node">未开始</strong></div>
+              <div class="metric"><span>真实碰撞</span><strong id="metric-collisions">0</strong></div>
+              <div class="metric"><span>无因果事件</span><strong id="metric-impossible">0</strong></div>
+              <div class="metric"><span>碰撞到声音</span><strong id="metric-audio">未发生</strong></div>
+            </div>
+            <div class="outcome-banner" id="outcome-banner"><span class="outcome-dot"></span><span>等待释放</span></div>
+            <div class="log-wrap" aria-live="polite">
+              <div class="log-head"><span>事件日志</span><span>仿真时间 / 证据</span></div>
+              <div class="event-log" id="event-log">
+                <div class="log-empty">释放后，实际碰撞会逐条出现在这里。</div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer-note">
+        <span>能量来源：初始重力势能。阻尼、摩擦与碰撞采用可解释的近似模型。</span>
+        <span>暂停冻结仿真；重置清空旧声音与待处理状态。</span>
+      </footer>
+    </div>
+    <script>(() => {
+  "use strict";
+
+  const WORLD = { width: 1600, height: 880, groundY: 742 };
+  const BASE_GRAVITY = 1120;
+  const BALL_RADIUS = 16;
+  const DOMINO_HEIGHT = 104;
+  const DOMINO_WIDTH = 17;
+  const TRACK = { a: { x: 670, y: 594 }, slope: 0.17 };
+  const RAMP = { a: { x: 105, y: 170 }, b: { x: 370, y: 420 } };
+  const BOARD = { pivot: { x: 560, y: 505 }, half: 210 };
+  const GATE = { hinge: { x: 820, y: 686 }, length: 150, latch: { x: 772, y: 563 } };
+  const BLOCKER = { x: 944, width: 16, height: 138 };
+  const DOMINO_XS = [986, 1038, 1090, 1142, 1194, 1246];
+  const BELL = { center: { x: 1435, y: 505 }, radius: 57 };
+  const HAMMER = { pivot: { x: 1365, y: 655 }, length: 143, headRadius: 14 };
+
+  const canvas = document.getElementById("scene");
+  const ctx = canvas.getContext("2d");
+  const canvasShell = document.getElementById("canvas-shell");
+  const canvasMode = document.getElementById("canvas-mode");
+  const canvasFreeze = document.getElementById("canvas-freeze");
+  const zoomRange = document.getElementById("zoom-range");
+  const zoomValue = document.getElementById("zoom-value");
+  const heightRange = document.getElementById("height-range");
+  const heightValue = document.getElementById("height-value");
+  const gravityButton = document.getElementById("gravity-button");
+  const releaseButton = document.getElementById("release-button");
+  const pauseButton = document.getElementById("pause-button");
+  const resetButton = document.getElementById("reset-button");
+  const lockSeesawButton = document.getElementById("lock-seesaw-button");
+  const blockCartButton = document.getElementById("block-cart-button");
+  const exportLogButton = document.getElementById("export-log-button");
+  const focusButtons = {
+    overview: document.getElementById("focus-overview"),
+    bell: document.getElementById("focus-bell"),
+    seesaw: document.getElementById("focus-seesaw"),
+  };
+
+  const focusPoints = {
+    overview: { x: 800, y: 430 },
+    bell: { x: 1290, y: 520 },
+    seesaw: { x: 570, y: 470 },
+  };
+
+  let view = { zoom: 1, focus: "overview", width: 1, height: 1, scale: 1, ox: 0, oy: 0, dpr: 1 };
+  let state = createInitialState();
+  let audioContext = null;
+  let audioNodes = [];
+  let lastFrame = performance.now();
+
+  function createInitialState() {
+    const rampStartY = rampY(158);
+    return {
+      running: false,
+      paused: false,
+      completed: false,
+      halted: false,
+      haltReason: "",
+      phase: "ready",
+      simTime: 0,
+      gravityHalf: false,
+      releaseRatio: 1,
+      seesawLockArmed: false,
+      blockerArmed: false,
+      impossibleEvents: 0,
+      collisionCount: 0,
+      eventLog: [],
+      contactWallTime: null,
+      audioStartWallTime: null,
+      audioDeltaMs: null,
+      ball: {
+        active: false,
+        x: 158,
+        y: rampStartY - BALL_RADIUS - 36,
+        vx: 0,
+        vy: 0,
+        support: null,
+        stopped: false,
+      },
+      seesaw: {
+        angle: 0,
+        angularVelocity: 0,
+        powered: false,
+        gateContact: false,
+        locked: false,
+        ballU: -105,
+      },
+      gate: {
+        angle: 0,
+        angularVelocity: 0,
+        opening: false,
+        opened: false,
+      },
+      cart: {
+        active: false,
+        x: 705,
+        vx: 0,
+        blocked: false,
+        blockerContact: false,
+      },
+      dominoes: DOMINO_XS.map((x, index) => ({ x, angle: 0, angularVelocity: 0, falling: false, contacted: false, index })),
+      hammer: { angle: -0.72, angularVelocity: 0, released: false, contact: false },
+      bell: { hit: false, ringPulse: 0 },
+      sign: { state: "营业", flipped: false },
+    };
+  }
+
+  function resetSimulation() {
+    stopAudio();
+    state = createInitialState();
+    state.gravityHalf = gravityButton.classList.contains("is-half");
+    state.releaseRatio = Number(heightRange.value) / 100;
+    lastFrame = performance.now();
+    setRunNote("释放后，所有后续动作只能由上一个环节的接触推动。");
+    updateUI();
+  }
+
+  function rampY(x) {
+    const t = (x - RAMP.a.x) / (RAMP.b.x - RAMP.a.x);
+    return RAMP.a.y + (RAMP.b.y - RAMP.a.y) * t;
+  }
+
+  function trackY(x) {
+    return TRACK.a.y + TRACK.slope * (x - TRACK.a.x);
+  }
+
+  function boardPoint(u, angle = state.seesaw.angle) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return { x: BOARD.pivot.x + u * c, y: BOARD.pivot.y + u * s };
+  }
+
+  function boardNormal(angle = state.seesaw.angle) {
+    return { x: -Math.sin(angle), y: -Math.cos(angle) };
+  }
+
+  function gateTop(angle = state.gate.angle) {
+    return {
+      x: GATE.hinge.x + Math.sin(angle) * GATE.length,
+      y: GATE.hinge.y - Math.cos(angle) * GATE.length,
+    };
+  }
+
+  function hammerHead(angle = state.hammer.angle) {
+    return {
+      x: HAMMER.pivot.x + Math.cos(angle) * HAMMER.length,
+      y: HAMMER.pivot.y + Math.sin(angle) * HAMMER.length,
+    };
+  }
+
+  function sgn(value) { return value < 0 ? -1 : 1; }
+  function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function dot(a, b) { return a.x * b.x + a.y * b.y; }
+  function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y }; }
+  function add(a, b) { return { x: a.x + b.x, y: a.y + b.y }; }
+  function mul(a, scalar) { return { x: a.x * scalar, y: a.y * scalar }; }
+
+  function normalize(vector) {
+    const length = Math.hypot(vector.x, vector.y) || 1;
+    return { x: vector.x / length, y: vector.y / length };
+  }
+
+  function closestPointOnSegment(point, a, b) {
+    const ab = sub(b, a);
+    const lengthSq = dot(ab, ab) || 1;
+    const t = clamp(dot(sub(point, a), ab) / lengthSq, 0, 1);
+    return add(a, mul(ab, t));
+  }
+
+  function physicalEvent({ type = "contact", label, object, detail, point, evidence = "actual contact" }) {
+    state.eventLog.push({
+      id: `${state.eventLog.length + 1}`,
+      t: state.simTime,
+      type,
+      label,
+      object,
+      detail,
+      point: { x: Math.round(point.x), y: Math.round(point.y) },
+      evidence,
+      actual: true,
+    });
+    if (type === "contact") state.collisionCount += 1;
+    if (type === "contact") state.contactWallTime = performance.now();
+  }
+
+  function impossibleEvent(label, detail) {
+    state.impossibleEvents += 1;
+    state.eventLog.push({
+      id: `${state.eventLog.length + 1}`,
+      t: state.simTime,
+      type: "invalid",
+      label,
+      object: "causal guard",
+      detail,
+      point: { x: 0, y: 0 },
+      evidence: "blocked by prerequisite guard",
+      actual: false,
+    });
+  }
+
+  function causalStateChange({ label, object, detail, point, prerequisite }) {
+    if (!prerequisite) {
+      impossibleEvent(label, `前置接触不存在: ${detail}`);
+      return false;
+    }
+    state.eventLog.push({
+      id: `${state.eventLog.length + 1}`,
+      t: state.simTime,
+      type: "state",
+      label,
+      object,
+      detail,
+      point: { x: Math.round(point.x), y: Math.round(point.y) },
+      evidence: "contact-derived state change",
+      actual: true,
+    });
+    return true;
+  }
+
+  function setPhase(phase) {
+    const phaseOrder = ["ready", "ramp", "seesaw", "gate", "cart", "domino", "bell", "done", "halted"];
+    if (phaseOrder.indexOf(phase) >= phaseOrder.indexOf(state.phase) || phase === "halted") state.phase = phase;
+  }
+
+  function releaseBall() {
+    if (state.running || state.completed) return;
+    ensureAudio();
+    state.running = true;
+    state.paused = false;
+    state.ball.active = true;
+    state.ball.x = 158;
+    state.ball.y = rampY(state.ball.x) - BALL_RADIUS - (36 * state.releaseRatio);
+    state.ball.vx = 0;
+    state.ball.vy = 0;
+    setPhase("ramp");
+    causalStateChange({
+      label: "释放第一颗球",
+      object: "操作者 → marble-01",
+      detail: `初始高度 ${Math.round(state.releaseRatio * 100)}% / 重力 ${state.gravityHalf ? "0.5g" : "1g"}`,
+      point: { x: state.ball.x, y: state.ball.y },
+      prerequisite: true,
+    });
+    setRunNote("已释放。现在只观察真实接触，不再追加外力。");
+    updateUI();
+  }
+
+  function armSeesawLock() {
+    if (state.running && (state.ball.support || state.seesaw.powered)) return;
+    state.seesawLockArmed = !state.seesawLockArmed;
+    if (state.seesawLockArmed) {
+      causalStateChange({ label: "预置跷跷板锁", object: "seesaw-lock", detail: "等待 marble-01 的到达接触", point: BOARD.pivot, prerequisite: !state.ball.support });
+      setRunNote("跷跷板锁已预置。球仍会真实滚到板上，但后续不会穿透锁定约束。");
+    }
+    updateUI();
+  }
+
+  function armCartBlocker() {
+    if (state.cart.x >= BLOCKER.x - 30 || state.cart.blockerContact) return;
+    state.blockerArmed = !state.blockerArmed;
+    if (state.blockerArmed) {
+      causalStateChange({ label: "预置小车挡板", object: "cart-blocker", detail: "等待 cart-01 进入多米诺区前的路径接触", point: { x: BLOCKER.x, y: trackY(BLOCKER.x) - BLOCKER.height }, prerequisite: state.cart.x < BLOCKER.x - 30 });
+      setRunNote("挡板已预置。小车撞上它后，后续多米诺与铃声不会凭空发生。");
+    }
+    updateUI();
+  }
+
+  function toggleGravity() {
+    if (state.running && state.phase !== "ramp") return;
+    state.gravityHalf = !state.gravityHalf;
+    gravityButton.classList.toggle("is-half", state.gravityHalf);
+    if (state.running) {
+      state.eventLog.push({
+        id: `${state.eventLog.length + 1}`,
+        t: state.simTime,
+        type: "state",
+        label: "修改重力参数",
+        object: "world.gravity",
+        detail: state.gravityHalf ? "切换到 0.5g" : "恢复到 1g",
+        point: { x: 80, y: 85 },
+        evidence: "live parameter edit",
+        actual: true,
+      });
+    }
+    updateUI();
+  }
+
+  function currentGravity() { return BASE_GRAVITY * (state.gravityHalf ? 0.5 : 1); }
+
+  function update(dt) {
+    if (!state.running || state.paused || state.halted || state.completed) return;
+    dt = Math.min(dt, 1 / 30);
+    state.simTime += dt;
+    updateBall(dt);
+    updateSeesaw(dt);
+    updateGate(dt);
+    updateCart(dt);
+    updateDominoes(dt);
+    updateHammer(dt);
+    updateBell(dt);
+  }
+
+  function updateBall(dt) {
+    const ball = state.ball;
+    if (!ball.active || ball.stopped) return;
+    const gravity = currentGravity();
+
+    if (ball.support === "seesaw") {
+      const point = boardPoint(state.seesaw.ballU);
+      const normal = boardNormal();
+      ball.x = point.x + normal.x * (BALL_RADIUS + 1);
+      ball.y = point.y + normal.y * (BALL_RADIUS + 1);
+      if (!state.seesaw.locked) {
+        state.seesaw.ballU = Math.min(130, state.seesaw.ballU + 48 * dt * (state.gravityHalf ? 0.78 : 1));
+      }
+      if (state.seesaw.gateContact) {
+        ball.support = null;
+        ball.active = false;
+      }
+      return;
+    }
+
+    ball.vy += gravity * dt;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    const rampStart = RAMP.a;
+    const rampEnd = RAMP.b;
+    const rampPoint = closestPointOnSegment({ x: ball.x, y: ball.y }, rampStart, rampEnd);
+    const rampTangent = normalize(sub(rampEnd, rampStart));
+    const rampNormal = normalize({ x: -rampTangent.y, y: rampTangent.x });
+    if (rampNormal.y > 0) { rampNormal.x *= -1; rampNormal.y *= -1; }
+    const rampDistance = dot(sub({ x: ball.x, y: ball.y }, rampPoint), rampNormal);
+    const withinRamp = ball.x >= rampStart.x - BALL_RADIUS && ball.x <= rampEnd.x + BALL_RADIUS;
+    if (withinRamp && rampDistance < BALL_RADIUS) {
+      ball.x += rampNormal.x * (BALL_RADIUS - rampDistance);
+      ball.y += rampNormal.y * (BALL_RADIUS - rampDistance);
+      const normalVelocity = dot({ x: ball.vx, y: ball.vy }, rampNormal);
+      if (normalVelocity < 0) {
+        ball.vx -= rampNormal.x * normalVelocity * 1.02;
+        ball.vy -= rampNormal.y * normalVelocity * 1.02;
+      }
+      const tangentialVelocity = dot({ x: ball.vx, y: ball.vy }, rampTangent);
+      const friction = 0.18 * gravity / BASE_GRAVITY;
+      const nextTangent = Math.max(0, tangentialVelocity + friction * dt * 0.7);
+      ball.vx += rampTangent.x * (nextTangent - tangentialVelocity);
+      ball.vy += rampTangent.y * (nextTangent - tangentialVelocity);
+      if (!ball.rampContact) {
+        ball.rampContact = true;
+        physicalEvent({ label: "弹珠接触斜坡", object: "marble-01 → ramp", detail: "法向约束建立，沿坡面滚动", point: rampPoint });
+      }
+    }
+
+    const leftBoard = boardPoint(-BOARD.half);
+    const rightBoard = boardPoint(BOARD.half);
+    const boardContact = closestPointOnSegment({ x: ball.x, y: ball.y }, leftBoard, rightBoard);
+    const boardDistance = distance({ x: ball.x, y: ball.y }, boardContact);
+    if (!ball.support && boardDistance <= BALL_RADIUS + 5 && ball.y < BOARD.pivot.y + 30) {
+      const boardTangent = normalize(sub(rightBoard, leftBoard));
+      state.seesaw.ballU = dot(sub(boardContact, BOARD.pivot), boardTangent);
+      ball.support = "seesaw";
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.x = boardContact.x;
+      ball.y = boardContact.y - BALL_RADIUS;
+      physicalEvent({ label: "弹珠撞上跷跷板", object: "marble-01 → seesaw", detail: state.seesawLockArmed ? "接触有效，锁约束正在阻止转动" : "偏心载荷施加到支点左侧", point: boardContact });
+      setPhase("seesaw");
+      if (state.seesawLockArmed) {
+        state.seesaw.locked = true;
+        ball.stopped = true;
+        state.halted = true;
+        state.haltReason = "跷跷板锁定";
+        setPhase("halted");
+        physicalEvent({ type: "constraint", label: "跷跷板锁定", object: "seesaw-lock ⊣ seesaw", detail: "真实接触发生，但转动自由度被锁住", point: BOARD.pivot, evidence: "constraint contact" });
+        setRunNote("已停在跷跷板。锁定约束生效，闸门没有被打开。");
+      } else {
+        state.seesaw.powered = true;
+      }
+    }
+
+    if (ball.y > WORLD.groundY - BALL_RADIUS) {
+      ball.y = WORLD.groundY - BALL_RADIUS;
+      ball.vy = 0;
+      ball.vx *= 0.94;
+    }
+  }
+
+  function updateSeesaw(dt) {
+    const seesaw = state.seesaw;
+    if (!seesaw.powered || seesaw.locked || seesaw.gateContact) return;
+    const gravityFactor = currentGravity() / BASE_GRAVITY;
+    seesaw.angularVelocity += 2.15 * gravityFactor * dt;
+    seesaw.angularVelocity *= Math.pow(0.992, dt * 60);
+    seesaw.angle += seesaw.angularVelocity * dt;
+    if (seesaw.angle > 0.29) seesaw.angle = 0.29;
+    const tip = boardPoint(BOARD.half);
+    if (!seesaw.gateContact && distance(tip, GATE.latch) <= 31) {
+      seesaw.gateContact = true;
+      physicalEvent({ label: "跷跷板尖端撞到闸门闩", object: "seesaw-tip → gate-latch", detail: "闸门获得开启角速度", point: tip });
+      setPhase("gate");
+      state.gate.opening = true;
+      state.gate.angularVelocity = -1.9 * gravityFactor;
+      causalStateChange({ label: "闸门开始打开", object: "gate-01", detail: "由 seesaw-tip → gate-latch 接触触发", point: gateTop(), prerequisite: seesaw.gateContact });
+      setRunNote("闸门已被跷跷板真实撞开。小车接下来只受轨道重力驱动。");
+      if (state.ball.support === "seesaw") {
+        state.ball.support = null;
+        state.ball.active = false;
+      }
+    }
+  }
+
+  function updateGate(dt) {
+    const gate = state.gate;
+    if (!gate.opening || gate.opened) return;
+    gate.angularVelocity -= 0.18 * (currentGravity() / BASE_GRAVITY) * dt;
+    gate.angularVelocity *= Math.pow(0.965, dt * 60);
+    gate.angle += gate.angularVelocity * dt;
+    if (gate.angle < -1.16) gate.angle = -1.16;
+    if (!gate.opened && gate.angle <= -0.24) {
+      gate.opened = true;
+      physicalEvent({ type: "constraint", label: "闸门让出小车路径", object: "gate-01 → cart-01", detail: "门体扫过安全边界，滚动路径解除阻挡", point: gateTop(), evidence: "clearance state" });
+      causalStateChange({ label: "小车被释放", object: "cart-01", detail: "闸门开度达到实际通行阈值", point: { x: state.cart.x, y: trackY(state.cart.x) }, prerequisite: gate.opened && state.seesaw.gateContact });
+      state.cart.active = true;
+      setPhase("cart");
+    }
+  }
+
+  function updateCart(dt) {
+    const cart = state.cart;
+    if (!cart.active || cart.blocked) return;
+    const gravity = currentGravity();
+    const trackAngle = Math.atan(TRACK.slope);
+    const trackAcceleration = gravity * Math.sin(trackAngle) * 0.48;
+    cart.vx += trackAcceleration * dt;
+    cart.vx *= Math.pow(0.994, dt * 60);
+    cart.x += cart.vx * dt;
+    if (!state.gate.opened && cart.x > GATE.hinge.x - 60) {
+      cart.x = GATE.hinge.x - 60;
+      cart.vx = 0;
+      physicalEvent({ type: "constraint", label: "小车撞住关闭的闸门", object: "cart-01 → gate-01", detail: "通行约束保持，未发生释放状态", point: { x: cart.x + 38, y: trackY(cart.x) }, evidence: "contact constraint" });
+    }
+    if (state.blockerArmed && !cart.blockerContact && cart.x + 42 >= BLOCKER.x - BLOCKER.width / 2) {
+      cart.x = BLOCKER.x - BLOCKER.width / 2 - 42;
+      cart.vx = 0;
+      cart.blocked = true;
+      cart.blockerContact = true;
+      physicalEvent({ type: "constraint", label: "小车撞上预置挡板", object: "cart-01 → cart-blocker", detail: "小车停止在多米诺区入口，后续无因果事件", point: { x: BLOCKER.x, y: trackY(BLOCKER.x) - 21 }, evidence: "contact constraint" });
+      state.halted = true;
+      state.haltReason = "小车挡板";
+      setPhase("halted");
+      setRunNote("已停在挡板。挡板后的多米诺、锤和铃没有被触发。");
+      return;
+    }
+    if (!cart.dominoContact && cart.x + 42 >= DOMINO_XS[0] - DOMINO_WIDTH / 2) {
+      cart.dominoContact = true;
+      const first = state.dominoes[0];
+      first.falling = true;
+      first.contacted = true;
+      first.angularVelocity = -2.4;
+      physicalEvent({ label: "小车撞倒第一块多米诺", object: "cart-01 → domino-01", detail: "车头接触砖块，第一块获得倒伏角速度", point: { x: DOMINO_XS[0] - 9, y: dominoBaseY(first) - 42 } });
+      setPhase("domino");
+    }
+    cart.y = trackY(cart.x) - 21;
+    if (cart.x > 1370) cart.active = false;
+  }
+
+  function dominoBaseY(domino) { return trackY(domino.x) - 2; }
+
+  function updateDominoes(dt) {
+    const gravityFactor = currentGravity() / BASE_GRAVITY;
+    for (let index = 0; index < state.dominoes.length; index += 1) {
+      const domino = state.dominoes[index];
+      if (!domino.falling) continue;
+      const direction = -1;
+      const gravityTorque = 4.8 * gravityFactor * Math.sin(Math.min(Math.abs(domino.angle), 1.42));
+      domino.angularVelocity += direction * gravityTorque * dt;
+      domino.angularVelocity *= Math.pow(0.982, dt * 60);
+      domino.angle += domino.angularVelocity * dt;
+      if (domino.angle < -1.42) domino.angle = -1.42;
+      if (index < state.dominoes.length - 1) {
+        const next = state.dominoes[index + 1];
+        const tip = dominoTip(domino);
+        if (!next.contacted && domino.angle < -0.27 && tip.x >= next.x - 12 && tip.y >= dominoBaseY(next) - DOMINO_HEIGHT * 0.65) {
+          next.contacted = true;
+          next.falling = true;
+          next.angularVelocity = -2.55;
+          physicalEvent({ label: `多米诺 ${String(index + 1).padStart(2, "0")} 撞倒下一块`, object: `domino-${String(index + 1).padStart(2, "0")} → domino-${String(index + 2).padStart(2, "0")}`, detail: "倾倒砖块的上缘进入下一块的接触范围", point: tip });
+        }
+      } else if (!state.hammer.contact) {
+        const tip = dominoTip(domino);
+        const hammerArmPoint = closestPointOnSegment(tip, HAMMER.pivot, hammerHead());
+        if (distance(tip, hammerArmPoint) < 25 && domino.angle < -0.46) {
+          state.hammer.contact = true;
+          state.hammer.released = true;
+          state.hammer.angularVelocity = -3.3 * gravityFactor;
+          physicalEvent({ label: "最后一块多米诺撞到锤臂", object: "domino-06 → hammer-01", detail: "锤子解除静止约束，开始摆向铃体", point: tip });
+          setPhase("bell");
+        }
+      }
+    }
+  }
+
+  function dominoTip(domino) {
+    const baseY = dominoBaseY(domino);
+    return {
+      x: domino.x - Math.sin(domino.angle) * DOMINO_HEIGHT,
+      y: baseY - Math.cos(domino.angle) * DOMINO_HEIGHT,
+    };
+  }
+
+  function updateHammer(dt) {
+    const hammer = state.hammer;
+    if (!hammer.released || state.bell.hit) return;
+    const gravityFactor = currentGravity() / BASE_GRAVITY;
+    hammer.angularVelocity -= 3.2 * gravityFactor * dt;
+    hammer.angularVelocity *= Math.pow(0.988, dt * 60);
+    hammer.angle += hammer.angularVelocity * dt;
+    hammer.angle = Math.max(-1.48, hammer.angle);
+  }
+
+  function updateBell(dt) {
+    const bell = state.bell;
+    if (bell.ringPulse > 0) bell.ringPulse = Math.max(0, bell.ringPulse - dt * 2.6);
+    if (bell.hit) return;
+    const head = hammerHead();
+    if (state.hammer.released && distance(head, BELL.center) <= BELL.radius + HAMMER.headRadius - 4) {
+      bell.hit = true;
+      bell.ringPulse = 1;
+      physicalEvent({ label: "锤头真实撞响铜铃", object: "hammer-01 → bell-01", detail: "距离约束进入铃体接触半径，声音在此帧启动", point: head });
+      state.contactWallTime = performance.now();
+      playBell();
+      state.sign.flipped = true;
+      state.sign.state = "下班";
+      causalStateChange({ label: "桌面指示牌切换为下班", object: "bell-01 → desk-sign", detail: "仅由 hammer-01 → bell-01 接触触发", point: { x: 1395, y: 135 }, prerequisite: bell.hit });
+      state.completed = true;
+      state.running = false;
+      setPhase("done");
+      setRunNote("完成。铃声来自真实锤铃接触，指示牌随铃声事件切换。");
+    }
+  }
+
+  function ensureAudio() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === "suspended") audioContext.resume();
+  }
+
+  function playBell() {
+    try {
+      ensureAudio();
+      const now = audioContext.currentTime;
+      const master = audioContext.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.18, now + 0.012);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + 1.35);
+      master.connect(audioContext.destination);
+      const nodes = [
+        [622, "sine", 1.3],
+        [932, "triangle", 1.05],
+        [1244, "sine", 0.75],
+      ];
+      const oscillators = nodes.map(([frequency, type, decay]) => {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, now);
+        oscillator.detune.setValueAtTime(type === "triangle" ? -7 : 0, now);
+        gain.gain.setValueAtTime(type === "triangle" ? 0.09 : 0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+        oscillator.connect(gain);
+        gain.connect(master);
+        oscillator.start(now);
+        oscillator.stop(now + decay + 0.04);
+        return oscillator;
+      });
+      audioNodes = oscillators.concat(master);
+      state.audioStartWallTime = performance.now();
+      state.audioDeltaMs = Math.max(0, state.audioStartWallTime - (state.contactWallTime || state.audioStartWallTime));
+    } catch (error) {
+      state.audioStartWallTime = performance.now();
+      state.audioDeltaMs = null;
+      state.eventLog.push({
+        id: `${state.eventLog.length + 1}`,
+        t: state.simTime,
+        type: "state",
+        label: "声音设备不可用",
+        object: "audio-output",
+        detail: "铃体碰撞已发生，但浏览器没有允许音频输出",
+        point: BELL.center,
+        evidence: "collision preserved; output unavailable",
+        actual: true,
+      });
+    }
+  }
+
+  function stopAudio() {
+    audioNodes.forEach((node) => {
+      try { node.stop(); } catch (_) { /* already stopped */ }
+      try { node.disconnect(); } catch (_) { /* already disconnected */ }
+    });
+    audioNodes = [];
+    if (audioContext && audioContext.state !== "closed") {
+      try { audioContext.suspend(); } catch (_) { /* browser may reject during teardown */ }
+    }
+  }
+
+  function togglePause() {
+    if (!state.running && !state.paused) return;
+    state.paused = !state.paused;
+    lastFrame = performance.now();
+    setRunNote(state.paused ? "暂停已冻结物理状态。没有后台计时，也没有待补放事件。" : "继续观察。下一帧从当前接触状态继续。");
+    updateUI();
+  }
+
+  function setRunNote(text) { document.getElementById("run-note").textContent = text; }
+
+  function updateUI() {
+    const statusText = state.completed ? "已下班" : state.halted ? `停在 ${state.haltReason}` : state.paused ? "已暂停" : state.running ? phaseLabel(state.phase) : "待释放";
+    document.getElementById("top-status").textContent = statusText;
+    const led = document.getElementById("status-led");
+    led.className = "status-led";
+    if (state.completed) led.classList.add("is-done");
+    else if (state.halted) led.classList.add("is-halted");
+    else if (state.running || state.paused) led.classList.add("is-running");
+    document.getElementById("run-state").textContent = state.completed ? "DONE" : state.halted ? "HALTED" : state.paused ? "PAUSED" : state.running ? "RUNNING" : "READY";
+    releaseButton.disabled = state.running || state.completed;
+    pauseButton.disabled = !state.running && !state.paused;
+    pauseButton.textContent = state.paused ? "继续" : "暂停";
+    lockSeesawButton.disabled = state.seesaw.powered || state.seesaw.locked || state.completed || state.halted;
+    blockCartButton.disabled = state.cart.blockerContact || state.completed || state.halted || state.cart.x >= BLOCKER.x - 30;
+
+    const lockState = document.getElementById("lock-state");
+    lockState.textContent = state.seesaw.locked ? "已触发" : state.seesawLockArmed ? "已预置" : "未预置";
+    lockSeesawButton.classList.toggle("is-armed", state.seesawLockArmed && !state.seesaw.locked);
+    lockSeesawButton.classList.toggle("is-triggered", state.seesaw.locked);
+    const blockState = document.getElementById("block-state");
+    blockState.textContent = state.cart.blockerContact ? "已触发" : state.blockerArmed ? "已预置" : "未预置";
+    blockCartButton.classList.toggle("is-armed", state.blockerArmed && !state.cart.blockerContact);
+    blockCartButton.classList.toggle("is-triggered", state.cart.blockerContact);
+
+    gravityButton.setAttribute("aria-pressed", String(state.gravityHalf));
+    gravityButton.classList.toggle("is-half", state.gravityHalf);
+    heightRange.disabled = state.running || state.completed;
+    gravityButton.disabled = state.completed || (state.running && state.phase !== "ramp");
+    heightValue.textContent = `${Math.round(state.releaseRatio * 100)}%`;
+
+    document.getElementById("metric-node").textContent = state.halted ? state.haltReason : phaseLabel(state.phase);
+    document.getElementById("metric-collisions").textContent = String(state.collisionCount);
+    document.getElementById("metric-impossible").textContent = String(state.impossibleEvents);
+    document.getElementById("metric-audio").textContent = state.audioDeltaMs == null ? "未发生" : `${state.audioDeltaMs.toFixed(1)} ms`;
+
+    const outcome = document.getElementById("outcome-banner");
+    outcome.className = "outcome-banner";
+    if (state.completed) {
+      outcome.classList.add("is-success");
+      outcome.innerHTML = '<span class="outcome-dot"></span><span>基线链完成，铃声与“下班”同步</span>';
+    } else if (state.halted) {
+      outcome.classList.add("is-halted");
+      outcome.innerHTML = `<span class="outcome-dot"></span><span>流程按阻挡停下：${state.haltReason}</span>`;
+    } else {
+      outcome.innerHTML = `<span class="outcome-dot"></span><span>${state.running ? "因果链运行中" : "等待释放"}</span>`;
+    }
+
+    canvasFreeze.hidden = !state.paused;
+    updateChainNodes();
+    renderLog();
+  }
+
+  function phaseLabel(phase) {
+    return ({ ready: "未开始", ramp: "滚动中", seesaw: "跷跷板", gate: "闸门", cart: "小车", domino: "多米诺", bell: "铃体", done: "已下班", halted: "已停下" })[phase] || phase;
+  }
+
+  function updateChainNodes() {
+    const nodeOrder = ["release", "ramp", "seesaw", "gate", "cart", "domino", "bell"];
+    const phaseMap = { ready: -1, ramp: 1, seesaw: 2, gate: 3, cart: 4, domino: 5, bell: 6, done: 7, halted: -1 };
+    const currentIndex = state.halted ? nodeOrder.indexOf(state.haltReason === "跷跷板锁定" ? "seesaw" : "cart") : phaseMap[state.phase];
+    document.querySelectorAll(".chain-node").forEach((node) => {
+      const index = nodeOrder.indexOf(node.dataset.node);
+      node.classList.remove("is-current", "is-passed", "is-halted");
+      if (state.halted && index === currentIndex) node.classList.add("is-halted");
+      else if (index === currentIndex) node.classList.add("is-current");
+      else if (index >= 0 && index < currentIndex) node.classList.add("is-passed");
+      if (state.completed && index <= 6) node.classList.add("is-passed");
+    });
+  }
+
+  function renderLog() {
+    const log = document.getElementById("event-log");
+    if (!state.eventLog.length) {
+      log.innerHTML = '<div class="log-empty">释放后，实际碰撞会逐条出现在这里。</div>';
+      return;
+    }
+    log.innerHTML = state.eventLog.slice(-16).map((event) => {
+      const badgeClass = event.type === "constraint" ? "constraint" : event.type === "state" ? "state" : "";
+      const badgeText = event.type === "contact" ? "CONTACT" : event.type === "constraint" ? "CONSTRAINT" : event.type === "state" ? "STATE" : "INVALID";
+      return `<div class="log-row"><div class="log-time">${event.t.toFixed(2)}s</div><div class="log-main"><div class="log-title"><span class="log-badge ${badgeClass}">${badgeText}</span><strong>${escapeHtml(event.label)}</strong></div><div class="log-detail">${escapeHtml(event.object)} · (${event.point.x}, ${event.point.y})<br>${escapeHtml(event.detail)}</div></div></div>`;
+    }).join("");
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+  }
+
+  function exportLog() {
+    const payload = {
+      title: "一颗弹珠，让整间实验室下班",
+      exportedAt: new Date().toISOString(),
+      result: state.completed ? "completed" : state.halted ? "halted" : state.running ? "running" : "not_started",
+      stopAt: state.haltReason || null,
+      parameters: { gravity: state.gravityHalf ? "0.5g" : "1g", releaseHeightPercent: Math.round(state.releaseRatio * 100) },
+      diagnostics: { collisionCount: state.collisionCount, impossibleEvents: state.impossibleEvents, collisionToAudioMs: state.audioDeltaMs },
+      events: state.eventLog,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "mechanical-chain-event-log.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function resizeCanvas() {
+    const rect = canvasShell.getBoundingClientRect();
+    view.width = rect.width;
+    view.height = rect.height;
+    view.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(rect.width * view.dpr);
+    canvas.height = Math.floor(rect.height * view.dpr);
+    calculateView();
+  }
+
+  function calculateView() {
+    view.scale = Math.min(view.width / WORLD.width, view.height / WORLD.height) * view.zoom;
+    const focus = focusPoints[view.focus] || focusPoints.overview;
+    view.ox = view.width / 2 - focus.x * view.scale;
+    view.oy = view.height / 2 - focus.y * view.scale;
+    canvasMode.textContent = `${view.focus === "overview" ? "OVERVIEW" : view.focus.toUpperCase()} / ${view.zoom.toFixed(2)}x`;
+    zoomValue.textContent = `${view.zoom.toFixed(2)}x`;
+  }
+
+  function worldToScreen(point) { return { x: view.ox + point.x * view.scale, y: view.oy + point.y * view.scale }; }
+  function screenToWorld(x, y) { return { x: (x - view.ox) / view.scale, y: (y - view.oy) / view.scale }; }
+
+  function render() {
+    const w = view.width;
+    const h = view.height;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#111617";
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(view.ox, view.oy);
+    ctx.scale(view.scale, view.scale);
+    drawWorldBackdrop();
+    drawBench();
+    drawSign();
+    drawRamp();
+    drawSeesaw();
+    drawGate();
+    drawCart();
+    drawBlocker();
+    drawDominoes();
+    drawBell();
+    drawHammer();
+    drawBall();
+    drawCallouts();
+    ctx.restore();
+  }
+
+  function drawWorldBackdrop() {
+    ctx.fillStyle = "#13191a";
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+    ctx.strokeStyle = "rgba(146,158,151,.065)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= WORLD.width; x += 80) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke();
+    }
+    for (let y = 0; y <= WORLD.height; y += 80) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(255,255,255,.025)";
+    ctx.fillRect(35, 35, 600, 2);
+    ctx.fillRect(965, 35, 580, 2);
+  }
+
+  function drawBench() {
+    ctx.fillStyle = "#292421";
+    ctx.fillRect(50, WORLD.groundY, 1500, 26);
+    ctx.fillStyle = "#3d332b";
+    ctx.fillRect(50, WORLD.groundY, 1500, 4);
+    ctx.fillStyle = "#1c1f1d";
+    ctx.fillRect(70, WORLD.groundY + 26, 18, 70);
+    ctx.fillRect(1486, WORLD.groundY + 26, 18, 70);
+    ctx.strokeStyle = "rgba(238,139,72,.2)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(85, WORLD.groundY + 45); ctx.lineTo(85, WORLD.groundY + 88); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1495, WORLD.groundY + 45); ctx.lineTo(1495, WORLD.groundY + 88); ctx.stroke();
+    ctx.fillStyle = "#8d7863";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText("WORKBENCH / 1600 mm VIEW", 95, WORLD.groundY + 17);
+  }
+
+  function drawSign() {
+    const x = 1375;
+    const y = 66;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "#2c302c";
+    ctx.fillRect(0, 0, 150, 72);
+    ctx.strokeStyle = state.sign.flipped ? "rgba(153,199,157,.88)" : "rgba(238,139,72,.78)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, 148, 70);
+    ctx.fillStyle = state.sign.flipped ? "#203127" : "#3b2b20";
+    ctx.fillRect(10, 10, 130, 52);
+    ctx.fillStyle = state.sign.flipped ? "#b9e0bb" : "#ffb06b";
+    ctx.font = "bold 27px 'PingFang SC', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(state.sign.state, 75, 36);
+    ctx.restore();
+    ctx.fillStyle = "#7f8a82";
+    ctx.font = "10px 'SF Mono', monospace";
+    ctx.fillText("bell-linked desk sign", x, y + 88);
+  }
+
+  function drawRamp() {
+    const a = RAMP.a;
+    const b = RAMP.b;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#4e5550";
+    ctx.lineWidth = 36;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.strokeStyle = "#b3aa96";
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y - 1); ctx.lineTo(b.x, b.y - 1); ctx.stroke();
+    ctx.strokeStyle = "rgba(238,139,72,.55)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 9]);
+    ctx.beginPath(); ctx.moveTo(a.x + 6, a.y - 12); ctx.lineTo(b.x + 6, b.y - 12); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#746758";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText("RAMP / gravity", 130, 150);
+    ctx.restore();
+  }
+
+  function drawSeesaw() {
+    const left = boardPoint(-BOARD.half);
+    const right = boardPoint(BOARD.half);
+    const pivot = BOARD.pivot;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.lineWidth = 20;
+    ctx.beginPath(); ctx.moveTo(left.x + 4, left.y + 7); ctx.lineTo(right.x + 4, right.y + 7); ctx.stroke();
+    ctx.strokeStyle = state.seesaw.locked ? "#6b9eab" : "#c0b7a6";
+    ctx.lineWidth = 15;
+    ctx.beginPath(); ctx.moveTo(left.x, left.y); ctx.lineTo(right.x, right.y); ctx.stroke();
+    ctx.strokeStyle = state.seesaw.powered && !state.seesaw.locked ? "#ef9758" : "#716e65";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(left.x, left.y - 5); ctx.lineTo(right.x, right.y - 5); ctx.stroke();
+    ctx.fillStyle = "#4a504b";
+    ctx.beginPath(); ctx.moveTo(pivot.x - 30, pivot.y + 55); ctx.lineTo(pivot.x + 30, pivot.y + 55); ctx.lineTo(pivot.x, pivot.y - 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = state.seesaw.locked ? "#99cbd3" : "#c6bda9";
+    ctx.beginPath(); ctx.arc(pivot.x, pivot.y, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#262b29"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#897b68";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText(state.seesaw.locked ? "LOCKED / contact" : "LEVER / contact", 436, 588);
+    if (state.seesawLockArmed && !state.seesaw.locked) drawLockIcon({ x: pivot.x - 48, y: pivot.y + 30 }, false);
+    if (state.seesaw.locked) drawLockIcon({ x: pivot.x - 48, y: pivot.y + 30 }, true);
+    ctx.restore();
+  }
+
+  function drawLockIcon(point, active) {
+    ctx.save();
+    ctx.strokeStyle = active ? "#8bb8c3" : "#6e8589";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(point.x - 9, point.y - 1, 18, 14);
+    ctx.beginPath(); ctx.arc(point.x, point.y - 2, 7, Math.PI, 0); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawGate() {
+    const top = gateTop();
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.lineWidth = 20;
+    ctx.beginPath(); ctx.moveTo(GATE.hinge.x + 5, GATE.hinge.y + 4); ctx.lineTo(top.x + 5, top.y + 4); ctx.stroke();
+    ctx.strokeStyle = state.gate.opened ? "#71837a" : "#d16f42";
+    ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.moveTo(GATE.hinge.x, GATE.hinge.y); ctx.lineTo(top.x, top.y); ctx.stroke();
+    ctx.fillStyle = "#b7a58d";
+    ctx.beginPath(); ctx.arc(GATE.hinge.x, GATE.hinge.y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ed9b5a";
+    ctx.beginPath(); ctx.arc(GATE.latch.x, GATE.latch.y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(238,139,72,.65)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(GATE.latch.x, GATE.latch.y, 18, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#897b68";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText("GATE / latch", 770, 705);
+    ctx.restore();
+  }
+
+  function drawCart() {
+    const cart = state.cart;
+    const y = trackY(cart.x);
+    ctx.save();
+    ctx.translate(cart.x, y - 23);
+    ctx.fillStyle = "rgba(0,0,0,.3)";
+    ctx.fillRect(-47, 23, 96, 7);
+    ctx.fillStyle = "#b5a98e";
+    ctx.fillRect(-39, -23, 78, 37);
+    ctx.fillStyle = "#5f6d67";
+    ctx.fillRect(-31, -15, 52, 17);
+    ctx.strokeStyle = "#e18b4d";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(-39, -23, 78, 37);
+    ctx.fillStyle = "#222826";
+    ctx.beginPath(); ctx.arc(-28, 17, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(28, 17, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#aeb9ad";
+    ctx.beginPath(); ctx.arc(-28, 17, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(28, 17, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "#897b68";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText("CART / gravity track", 675, 635);
+    ctx.strokeStyle = "rgba(199,180,149,.5)";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(650, trackY(650)); ctx.lineTo(1378, trackY(1378)); ctx.stroke();
+  }
+
+  function drawBlocker() {
+    if (!state.blockerArmed && !state.cart.blockerContact) return;
+    const y = trackY(BLOCKER.x);
+    ctx.save();
+    ctx.translate(BLOCKER.x, y - BLOCKER.height);
+    ctx.fillStyle = state.cart.blockerContact ? "#7ea9b4" : "#8bb8c3";
+    ctx.fillRect(-BLOCKER.width / 2, 0, BLOCKER.width, BLOCKER.height);
+    ctx.strokeStyle = "#b4d3d8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-BLOCKER.width / 2, 0, BLOCKER.width, BLOCKER.height);
+    ctx.strokeStyle = "rgba(24,39,42,.6)";
+    ctx.lineWidth = 4;
+    for (let yLine = 16; yLine < BLOCKER.height - 2; yLine += 23) { ctx.beginPath(); ctx.moveTo(-7, yLine); ctx.lineTo(7, yLine + 12); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "#8bb8c3";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText(state.cart.blockerContact ? "BLOCKED / contact" : "INTERVENTION / blocker", BLOCKER.x - 70, y - BLOCKER.height - 14);
+  }
+
+  function drawDominoes() {
+    state.dominoes.forEach((domino, index) => {
+      const baseY = dominoBaseY(domino);
+      ctx.save();
+      ctx.translate(domino.x, baseY);
+      ctx.rotate(domino.angle);
+      ctx.fillStyle = domino.contacted ? "#d18a54" : "#b0a896";
+      ctx.fillRect(-DOMINO_WIDTH / 2, -DOMINO_HEIGHT, DOMINO_WIDTH, DOMINO_HEIGHT);
+      ctx.strokeStyle = domino.contacted ? "#efac68" : "#dfd5c0";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-DOMINO_WIDTH / 2, -DOMINO_HEIGHT, DOMINO_WIDTH, DOMINO_HEIGHT);
+      ctx.fillStyle = domino.contacted ? "#55331f" : "#5c665f";
+      ctx.beginPath(); ctx.arc(0, -DOMINO_HEIGHT + 26, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -DOMINO_HEIGHT + 52, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      if (index === 0) {
+        ctx.fillStyle = "#897b68";
+        ctx.font = "11px 'SF Mono', monospace";
+        ctx.fillText("DOMINO ZONE", domino.x - 34, baseY + 28);
+      }
+    });
+  }
+
+  function drawBell() {
+    const bell = BELL;
+    const pulse = state.bell.ringPulse;
+    ctx.save();
+    ctx.strokeStyle = "#777b73";
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(bell.center.x, bell.center.y - 5); ctx.lineTo(bell.center.x, 660); ctx.stroke();
+    ctx.fillStyle = "#c2af83";
+    ctx.beginPath(); ctx.arc(bell.center.x, bell.center.y - 46, 15, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "#d8c38f";
+    ctx.beginPath();
+    ctx.moveTo(bell.center.x - 19, bell.center.y - 35);
+    ctx.quadraticCurveTo(bell.center.x - 50, bell.center.y + 28, bell.center.x - 66, bell.center.y + 38);
+    ctx.lineTo(bell.center.x + 66, bell.center.y + 38);
+    ctx.quadraticCurveTo(bell.center.x + 50, bell.center.y + 28, bell.center.x + 19, bell.center.y - 35);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#8d7650"; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = "#826a46";
+    ctx.beginPath(); ctx.arc(bell.center.x, bell.center.y + 39, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = pulse > 0 ? `rgba(255, 191, 107, ${0.75 * pulse})` : "rgba(238,139,72,.16)";
+    ctx.lineWidth = 3;
+    for (let ring = 1; ring <= 3; ring += 1) {
+      const radius = 80 + ring * 19 + (1 - pulse) * 10;
+      ctx.beginPath(); ctx.arc(bell.center.x, bell.center.y + 7, radius, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    }
+    ctx.fillStyle = "#b8a986";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText(state.bell.hit ? "BELL / struck" : "BELL / waiting", bell.center.x - 47, 690);
+    ctx.restore();
+  }
+
+  function drawHammer() {
+    const head = hammerHead();
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,.28)";
+    ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.moveTo(HAMMER.pivot.x + 3, HAMMER.pivot.y + 5); ctx.lineTo(head.x + 3, head.y + 5); ctx.stroke();
+    ctx.strokeStyle = state.hammer.released ? "#e18b4d" : "#9a9b8d";
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(HAMMER.pivot.x, HAMMER.pivot.y); ctx.lineTo(head.x, head.y); ctx.stroke();
+    ctx.fillStyle = state.hammer.released ? "#e99150" : "#a8a28d";
+    ctx.fillRect(head.x - 19, head.y - 13, 38, 26);
+    ctx.fillStyle = "#30352f";
+    ctx.beginPath(); ctx.arc(HAMMER.pivot.x, HAMMER.pivot.y, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#c1b39a";
+    ctx.font = "11px 'SF Mono', monospace";
+    ctx.fillText(state.hammer.released ? "HAMMER / released" : "HAMMER / held", 1280, 718);
+    ctx.restore();
+  }
+
+  function drawBall() {
+    const ball = state.ball;
+    if (!ball.active && !state.running) {
+      drawBallAt({ x: ball.x, y: ball.y }, true);
+      return;
+    }
+    if (ball.active || ball.stopped) drawBallAt({ x: ball.x, y: ball.y }, false);
+  }
+
+  function drawBallAt(point, waiting) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.35)";
+    ctx.beginPath(); ctx.ellipse(point.x + 5, point.y + BALL_RADIUS + 9, BALL_RADIUS * 1.15, 5, 0, 0, Math.PI * 2); ctx.fill();
+    const gradient = ctx.createRadialGradient(point.x - 5, point.y - 6, 2, point.x, point.y, BALL_RADIUS + 2);
+    gradient.addColorStop(0, waiting ? "#ffe2b8" : "#fff1d5");
+    gradient.addColorStop(0.45, waiting ? "#ed9d59" : "#f2a25d");
+    gradient.addColorStop(1, "#9e4d2f");
+    ctx.fillStyle = gradient;
+    ctx.beginPath(); ctx.arc(point.x, point.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,237,198,.78)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#fff4dc";
+    ctx.beginPath(); ctx.arc(point.x - 5, point.y - 6, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCallouts() {
+    const labels = [
+      { text: "01 / RELEASE", x: 113, y: 105, to: { x: 158, y: 150 }, color: "#ee8b48" },
+      { text: "03 / LEVER", x: 407, y: 445, to: BOARD.pivot, color: "#d9d2c2" },
+      { text: "05 / CART", x: 680, y: 565, to: { x: state.cart.x, y: trackY(state.cart.x) - 23 }, color: "#d9d2c2" },
+      { text: "07 / RING", x: 1390, y: 394, to: BELL.center, color: "#d9d2c2" },
+    ];
+    ctx.save();
+    ctx.font = "10px 'SF Mono', monospace";
+    labels.forEach((label) => {
+      ctx.fillStyle = label.color;
+      ctx.fillText(label.text, label.x, label.y);
+      ctx.strokeStyle = "rgba(238,139,72,.42)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(label.x, label.y + 7); ctx.lineTo(label.to.x, label.to.y - 8); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function frame(now) {
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    update(dt);
+    render();
+    updateUI();
+    requestAnimationFrame(frame);
+  }
+
+  function setFocus(name) {
+    view.focus = name;
+    calculateView();
+  }
+
+  releaseButton.addEventListener("click", releaseBall);
+  pauseButton.addEventListener("click", togglePause);
+  resetButton.addEventListener("click", resetSimulation);
+  lockSeesawButton.addEventListener("click", armSeesawLock);
+  blockCartButton.addEventListener("click", armCartBlocker);
+  gravityButton.addEventListener("click", toggleGravity);
+  exportLogButton.addEventListener("click", exportLog);
+  heightRange.addEventListener("input", () => {
+    state.releaseRatio = Number(heightRange.value) / 100;
+    state.ball.y = rampY(state.ball.x) - BALL_RADIUS - (36 * state.releaseRatio);
+    heightValue.textContent = `${heightRange.value}%`;
+  });
+  zoomRange.addEventListener("input", () => {
+    view.zoom = Number(zoomRange.value);
+    calculateView();
+  });
+  focusButtons.overview.addEventListener("click", () => setFocus("overview"));
+  focusButtons.bell.addEventListener("click", () => setFocus("bell"));
+  focusButtons.seesaw.addEventListener("click", () => setFocus("seesaw"));
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    view.zoom = clamp(view.zoom + (event.deltaY > 0 ? -0.06 : 0.06), 0.72, 1.7);
+    zoomRange.value = String(view.zoom);
+    calculateView();
+  }, { passive: false });
+  window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("keydown", (event) => {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return;
+    if (event.code === "Space") { event.preventDefault(); togglePause(); }
+    if (event.key.toLowerCase() === "r") resetSimulation();
+    if (event.key === "Enter") releaseBall();
+  });
+
+  resizeCanvas();
+  updateUI();
+  requestAnimationFrame(frame);
+})();
+</script>
+  </body>
+</html>
